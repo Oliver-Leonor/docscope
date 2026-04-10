@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "src/app/api/upload/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/session/[id]/chat/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}
