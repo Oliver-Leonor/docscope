@@ -8,6 +8,14 @@ import { withRetry } from "./retry"
 const CHAT_MODEL = "gpt-4o-mini"
 const HISTORY_WINDOW = 10 // most recent turns included in the prompt
 const RETRIEVAL_TOP_K = 5
+/**
+ * Cosine-similarity floor below which we treat the retrieval context
+ * as "doesn't really cover this question" and nudge the model to lean
+ * on general electrical-engineering knowledge instead of strictly
+ * grounding. Tuned by eye — typical on-topic queries in our test set
+ * score 0.35–0.55 against a good matching chunk.
+ */
+const LOW_RELEVANCE_THRESHOLD = 0.3
 
 let _openai: OpenAI | null = null
 function openai(): OpenAI {
@@ -16,27 +24,43 @@ function openai(): OpenAI {
 }
 
 /**
- * Generate a streaming chat response grounded in electrical sheet content.
+ * Generate a streaming chat response for a session.
  *
- * RAG flow:
- *   1. Pull recent chat history (last {@link HISTORY_WINDOW} messages)
- *      BEFORE saving the new user message, so we don't have to trim
- *      it back out of the returned window.
- *   2. Persist the user message to `Message`.
- *   3. Retrieve the top-{@link RETRIEVAL_TOP_K} most relevant chunks via
- *      pgvector cosine similarity in {@link retrieveRelevantChunks}.
- *   4. Assemble a system prompt that pins the model to the retrieved
- *      context and enforces sheet citations.
- *   5. Stream the completion from {@link CHAT_MODEL}, forwarding token
- *      chunks to the caller via a `ReadableStream<Uint8Array>`.
- *   6. After the stream closes, parse cited sheets out of the final text
- *      and persist the assistant message.
+ * Two-tier answering strategy:
+ *
+ *   Tier 1 — project grounding. Run pgvector cosine-similarity
+ *     retrieval on the user's question, pack the top-K chunks into
+ *     the system prompt, and ask the model to answer from them first.
+ *     When the sheets contain the answer, it cites the source sheet
+ *     inline (e.g. "According to sheet E-201…").
+ *
+ *   Tier 2 — general-knowledge fallback. When the sheets don't cover
+ *     the question, the model is allowed to supplement with its own
+ *     electrical-engineering expertise, as long as it clearly flags
+ *     what's from the drawings versus what's general guidance
+ *     (code requirements, best practices, terminology).
+ *
+ * Low-relevance detection: if the best-matching chunk's similarity is
+ * below {@link LOW_RELEVANCE_THRESHOLD} (or we got zero hits at all),
+ * we still pass the chunks into the prompt but prepend a note telling
+ * the model the context is unlikely to be helpful and it should lean
+ * on general knowledge. This catches the common case where a user
+ * asks a code-requirement or best-practices question that nothing in
+ * the drawing set can answer.
+ *
+ * Completely off-topic questions (non-electrical, non-construction)
+ * get a polite redirect — the prompt tells the model to steer back
+ * to the project's electrical scope instead of answering.
+ *
+ * Everything else — history window, user-message persistence,
+ * streaming, assistant-message persistence, citation extraction — is
+ * unchanged from the prior implementation.
  *
  * Why `gpt-4o-mini` over `gpt-4o`:
  *   - 15× cheaper ($0.15 vs $2.50 / 1M input tokens)
  *   - Fast first-token latency (<2s) for snappy chat UX
- *   - Retrieval grounds the answer, so the extra reasoning headroom of
- *     `gpt-4o` is rarely worth the cost for this task
+ *   - Retrieval grounds most answers, and general-knowledge fallback
+ *     doesn't stretch beyond what `gpt-4o-mini` handles well
  *   - At 100 PDFs/day this saves ~$50/day
  */
 export async function generateChatResponse(
@@ -61,12 +85,16 @@ export async function generateChatResponse(
     },
   })
 
-  // 3. Retrieve grounding chunks.
+  // 3. Retrieve grounding chunks and judge their relevance.
   const relevantChunks = await retrieveRelevantChunks(
     sessionId,
     userMessage,
     RETRIEVAL_TOP_K,
   )
+  const topSimilarity = relevantChunks[0]?.similarity ?? 0
+  const isLowRelevance =
+    relevantChunks.length === 0 || topSimilarity < LOW_RELEVANCE_THRESHOLD
+
   const contextBlock =
     relevantChunks.length === 0
       ? "(no indexed electrical content matched this question)"
@@ -74,18 +102,26 @@ export async function generateChatResponse(
           .map((c) => `[Source: Sheet ${c.sheetNumber}]\n${c.content}`)
           .join("\n\n---\n\n")
 
-  // 4. Build the OpenAI messages payload.
-  const systemPrompt = `You are an expert electrical engineer assistant analyzing construction drawing sets. You answer questions ONLY based on the electrical sheet content provided below.
+  // Inserted immediately above the sheet content when Tier-1 retrieval
+  // came back weak, so the model sees the warning in close proximity
+  // to the (likely unhelpful) chunks it's being offered.
+  const lowRelevanceNote = isLowRelevance
+    ? `NOTE: The extracted sheet content below has low relevance to this question. Use your general electrical engineering expertise to answer, and mention if any sheet content happens to be relevant.
 
-RULES:
-- Always cite which sheet your information comes from using the format "According to sheet E-XXX" or "(Sheet E-XXX)"
-- If multiple sheets are relevant, cite all of them
-- If the provided content doesn't contain enough information to answer, say "I don't have enough information in the extracted electrical sheets to answer that question."
-- Be specific: mention exact panel ratings, wire sizes, conduit types, amperage, voltage, etc. when available
-- Keep answers clear and professional — you're talking to a construction professional
-- Do not make up information that isn't in the source content
+`
+    : ""
 
-ELECTRICAL SHEET CONTENT:
+  // 4. Build the two-tier system prompt.
+  const systemPrompt = `You are an expert electrical engineer assistant. You have access to extracted content from electrical construction drawings for this project.
+
+ANSWERING STRATEGY:
+1. FIRST, try to answer using the provided electrical sheet content below. Always cite sheets when using this content (e.g., "According to sheet E-201...").
+2. If the sheet content doesn't contain enough information to fully answer the question, supplement with your general electrical engineering knowledge. When doing this, clearly distinguish between what comes from the project sheets vs. your general knowledge.
+   - For project-specific data (panel sizes, service voltage, conduit specs): cite the sheets.
+   - For general knowledge (code requirements, best practices, terminology explanations): you can answer directly but note it's general guidance, not from the project drawings.
+3. If the question is completely unrelated to electrical engineering or construction, politely redirect: "I'm specialized in electrical construction scope. Could you ask something about the electrical systems in this project?"
+
+${lowRelevanceNote}ELECTRICAL SHEET CONTENT:
 ${contextBlock}`
 
   const messages: ChatCompletionMessageParam[] = [
