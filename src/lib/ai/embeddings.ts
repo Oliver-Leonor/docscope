@@ -2,6 +2,7 @@ import OpenAI from "openai"
 import { v4 as uuidv4 } from "uuid"
 
 import { prisma } from "../db"
+import { withRetry } from "./retry"
 
 const EMBEDDING_MODEL = "text-embedding-3-small"
 const EMBEDDING_DIMS = 1536
@@ -46,10 +47,12 @@ export async function embedAndStoreChunks(
   for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
     const batch = chunks.slice(i, i + BATCH_SIZE)
 
-    const response = await client.embeddings.create({
-      model: EMBEDDING_MODEL,
-      input: batch.map((c) => c.content),
-    })
+    const response = await withRetry(() =>
+      client.embeddings.create({
+        model: EMBEDDING_MODEL,
+        input: batch.map((c) => c.content),
+      }),
+    )
 
     if (response.data.length !== batch.length) {
       throw new Error(
@@ -93,10 +96,12 @@ export async function retrieveRelevantChunks(
 > {
   const client = openai()
 
-  const embedding = await client.embeddings.create({
-    model: EMBEDDING_MODEL,
-    input: query,
-  })
+  const embedding = await withRetry(() =>
+    client.embeddings.create({
+      model: EMBEDDING_MODEL,
+      input: query,
+    }),
+  )
   const vec = embedding.data[0].embedding
   const vectorLiteral = toVectorLiteral(vec)
 

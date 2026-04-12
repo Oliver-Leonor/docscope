@@ -1,3 +1,4 @@
+// VISUAL UPDATE: removed hard-coded body colors, added gradient backdrop + subtle radial accent, max-width 1200px container
 import type { Metadata } from "next"
 import { DM_Sans, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
@@ -50,7 +51,7 @@ export const metadata: Metadata = {
     description: siteDescription,
   },
   robots: {
-    index: false, // private tool by default — flip when going public
+    index: false,
     follow: false,
   },
   icons: {
@@ -68,8 +69,16 @@ export default function RootLayout({
       lang="en"
       className={`dark ${dmSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-[#0a0a0b] text-[#ededed] font-sans">
-        <div className="mx-auto w-full max-w-6xl px-6 py-8">{children}</div>
+      <body className="relative min-h-full bg-background text-foreground font-sans">
+        {/* Subtle top-of-page radial glow — construction tool feel
+            without crossing into consumer-y territory. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(59,130,246,0.08),transparent_70%)]"
+        />
+        <div className="mx-auto w-full max-w-[1200px] px-6 py-8 sm:px-8 sm:py-10">
+          {children}
+        </div>
       </body>
     </html>
   )

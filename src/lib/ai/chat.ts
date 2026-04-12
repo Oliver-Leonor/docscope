@@ -3,6 +3,7 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 
 import { prisma } from "../db"
 import { retrieveRelevantChunks } from "./embeddings"
+import { withRetry } from "./retry"
 
 const CHAT_MODEL = "gpt-4o-mini"
 const HISTORY_WINDOW = 10 // most recent turns included in the prompt
@@ -99,13 +100,15 @@ ${contextBlock}`
 
   // 5. Kick off the streaming completion.
   const client = openai()
-  const completion = await client.chat.completions.create({
-    model: CHAT_MODEL,
-    messages,
-    stream: true,
-    temperature: 0.2, // low temperature for grounded, factual answers
-    max_tokens: 1500,
-  })
+  const completion = await withRetry(() =>
+    client.chat.completions.create({
+      model: CHAT_MODEL,
+      messages,
+      stream: true,
+      temperature: 0.2, // low temperature for grounded, factual answers
+      max_tokens: 1500,
+    }),
+  )
 
   const encoder = new TextEncoder()
   let fullResponse = ""

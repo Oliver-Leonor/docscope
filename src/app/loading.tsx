@@ -1,22 +1,17 @@
+// VISUAL UPDATE: skeleton uses semantic surface/border tokens and matches new home-page rhythm
 import { Loader2 } from "lucide-react"
 
-/**
- * Route-level loading UI shown by Next.js while the home route's
- * server components are streaming. Matches the dark theme and stays
- * compact — the per-section `SessionListSkeleton` handles the more
- * granular loading state inside the page itself.
- */
 export default function Loading() {
   return (
-    <div className="flex flex-col gap-10">
-      <header className="flex flex-col gap-3">
-        <div className="h-5 w-24 animate-pulse rounded bg-white/5" />
-        <div className="h-10 w-72 animate-pulse rounded bg-white/5 sm:h-12" />
-        <div className="h-4 w-full max-w-xl animate-pulse rounded bg-white/5" />
+    <div className="pz-fade-in flex flex-col gap-12">
+      <header className="flex flex-col gap-4">
+        <div className="h-5 w-28 animate-pulse rounded-md bg-surface" />
+        <div className="h-12 w-80 animate-pulse rounded-lg bg-surface sm:h-14" />
+        <div className="h-4 w-full max-w-xl animate-pulse rounded bg-surface" />
       </header>
-      <div className="h-56 animate-pulse rounded-xl border border-white/10 bg-[#111113]" />
-      <div className="flex items-center gap-2 text-sm text-white/50">
-        <Loader2 className="h-4 w-4 animate-spin" />
+      <div className="h-56 animate-pulse rounded-xl border border-border bg-surface" />
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin text-brand" />
         Loading…
       </div>
     </div>

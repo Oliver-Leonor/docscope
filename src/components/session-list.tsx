@@ -1,3 +1,4 @@
+// VISUAL UPDATE: rows use pz-lift hover, semantic tokens, relative time formatter, sharper status badges, truncated filenames
 import { AlertCircle, CheckCircle2, Clock, FileText } from "lucide-react"
 import Link from "next/link"
 
@@ -15,15 +16,6 @@ interface SessionRow {
   sheetCount: number
 }
 
-/**
- * Server component: lists every session for this project, most recent
- * first, with a compact status badge and sheet-count summary. Clicking
- * a row navigates to `/session/[id]`.
- *
- * Prisma may fail if DATABASE_URL isn't set (dev setup, missing .env,
- * Neon DB unreachable). In that case we degrade gracefully to a helpful
- * empty state instead of crashing the whole home page render.
- */
 export async function SessionList() {
   let rows: SessionRow[] = []
   let dbError: string | null = null
@@ -73,25 +65,30 @@ export async function SessionList() {
 
   return (
     <ul className="flex flex-col gap-2">
-      {rows.map((row) => (
+      {rows.map((row, i) => (
         <li
           key={row.id}
-          className="group flex items-center gap-2 rounded-lg border border-white/10 bg-[#111113] pr-2 transition-all duration-200 hover:border-brand/50 hover:bg-[#14141a]"
+          className="pz-fade-in-up pz-lift group flex items-center gap-2 rounded-lg border border-border bg-surface pr-2 hover:border-[#3f3f46] hover:bg-surface-elevated"
+          style={{ ["--pz-delay" as string]: `${i * 40}ms` }}
         >
           <Link
             href={`/session/${row.id}`}
-            className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3"
+            className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3.5"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-brand/10 text-brand">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand ring-1 ring-inset ring-brand/20">
               <FileText className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-white">
+              <p className="truncate text-sm font-medium text-foreground">
                 {row.pdfFileName}
               </p>
-              <p className="text-xs text-white/50">
-                {formatDate(row.createdAt)} · {row.sheetCount}{" "}
-                {row.sheetCount === 1 ? "sheet" : "sheets"}
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                <span>{formatRelative(row.createdAt)}</span>
+                <span className="mx-1.5 text-[#52525b]">·</span>
+                <span>
+                  {row.sheetCount}{" "}
+                  {row.sheetCount === 1 ? "sheet" : "sheets"}
+                </span>
               </p>
             </div>
             <StatusBadge status={row.status} />
@@ -107,8 +104,7 @@ export async function SessionList() {
 }
 
 /**
- * Suspense fallback skeleton for the session list. Rendered while the
- * async server component awaits its Prisma query on SSR.
+ * Suspense fallback skeleton for the session list.
  */
 export function SessionListSkeleton() {
   return (
@@ -116,15 +112,14 @@ export function SessionListSkeleton() {
       {Array.from({ length: 3 }).map((_, i) => (
         <li
           key={i}
-          className="flex items-center gap-4 rounded-lg border border-white/10 bg-[#111113] px-4 py-3"
-          style={{ animationDelay: `${i * 80}ms` }}
+          className="flex items-center gap-4 rounded-lg border border-border bg-surface px-4 py-3.5"
         >
-          <div className="h-10 w-10 shrink-0 animate-pulse rounded bg-white/5" />
+          <div className="h-10 w-10 shrink-0 animate-pulse rounded-lg bg-surface-elevated" />
           <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <div className="h-3 w-2/3 animate-pulse rounded bg-white/5" />
-            <div className="h-2.5 w-1/3 animate-pulse rounded bg-white/5" />
+            <div className="h-3 w-2/3 animate-pulse rounded bg-surface-elevated" />
+            <div className="h-2.5 w-1/3 animate-pulse rounded bg-surface-elevated" />
           </div>
-          <div className="h-5 w-16 animate-pulse rounded bg-white/5" />
+          <div className="h-5 w-16 animate-pulse rounded-full bg-surface-elevated" />
         </li>
       ))}
     </ul>
@@ -134,23 +129,23 @@ export function SessionListSkeleton() {
 function StatusBadge({ status }: { status: string }) {
   if (status === "ready") {
     return (
-      <Badge className="gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20">
-        <CheckCircle2 className="h-3 w-3" />
+      <Badge className="shrink-0 gap-1.5 rounded-full border-[#22c55e]/25 bg-[#22c55e]/10 px-2 py-0.5 text-[11px] font-medium text-[#4ade80] hover:bg-[#22c55e]/15">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" />
         Ready
       </Badge>
     )
   }
   if (status === "error") {
     return (
-      <Badge className="gap-1 border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20">
+      <Badge className="shrink-0 gap-1.5 rounded-full border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-300 hover:bg-red-500/15">
         <AlertCircle className="h-3 w-3" />
         Error
       </Badge>
     )
   }
   return (
-    <Badge className="gap-1 border-brand/30 bg-brand/10 text-brand hover:bg-brand/20">
-      <Clock className="h-3 w-3" />
+    <Badge className="shrink-0 gap-1.5 rounded-full border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-300 hover:bg-amber-500/15">
+      <span className="pz-soft-pulse h-1.5 w-1.5 rounded-full bg-amber-400" />
       Processing
     </Badge>
   )
@@ -168,24 +163,47 @@ function EmptyState({
   return (
     <div
       className={cn(
-        "rounded-lg border border-dashed px-6 py-10 text-center",
+        "rounded-xl border border-dashed px-6 py-12 text-center",
         tone === "error"
-          ? "border-red-500/30 bg-red-500/5"
-          : "border-white/10 bg-[#111113]",
+          ? "border-red-500/30 bg-red-500/[0.04]"
+          : "border-border bg-surface",
       )}
     >
-      <p className="text-sm font-medium text-white">{title}</p>
-      <p className="mt-1 text-xs text-white/50">{description}</p>
+      <p className="text-sm font-medium text-foreground">{title}</p>
+      <p className="mt-1.5 text-xs text-muted-foreground">{description}</p>
     </div>
   )
 }
 
-function formatDate(date: Date): string {
+/**
+ * "2 hours ago" style relative formatter. Falls back to a short
+ * absolute date for anything older than a week so the user still
+ * gets a definite reference point.
+ */
+function formatRelative(date: Date): string {
+  const now = Date.now()
+  const diffMs = now - date.getTime()
+  const minute = 60_000
+  const hour = 60 * minute
+  const day = 24 * hour
+  const week = 7 * day
+
+  if (diffMs < minute) return "just now"
+  if (diffMs < hour) {
+    const n = Math.round(diffMs / minute)
+    return `${n} minute${n === 1 ? "" : "s"} ago`
+  }
+  if (diffMs < day) {
+    const n = Math.round(diffMs / hour)
+    return `${n} hour${n === 1 ? "" : "s"} ago`
+  }
+  if (diffMs < week) {
+    const n = Math.round(diffMs / day)
+    return `${n} day${n === 1 ? "" : "s"} ago`
+  }
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
   }).format(date)
 }

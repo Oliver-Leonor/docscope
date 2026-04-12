@@ -1,3 +1,4 @@
+// VISUAL UPDATE: min-h-screen flex layout so chat can flex-grow, compact nav, mono muted session ID, pz-fade-in on state transitions, semantic tokens
 "use client"
 
 import { AlertCircle, ArrowLeft, Loader2, Zap } from "lucide-react"
@@ -24,22 +25,6 @@ type ViewState =
   | { kind: "error"; message: string }
   | { kind: "loaded"; session: SessionStatus }
 
-/**
- * Session detail page.
- *
- * Client component because we need to poll `/api/session/[id]/status`
- * every 2s while the upload pipeline is still running and swap the
- * cover page + chat in without a full route reload. Uses React 19's
- * `use()` to unwrap the `params` Promise that Next.js 16 hands us.
- *
- * The server's initial data fetch is delegated to the status API —
- * that keeps this page purely client-side, avoids double-fetching
- * on hydration, and gives us one authoritative source of truth for
- * session state (useful later for SWR / real-time push).
- *
- * Layout follows the spec: compact nav, then cover page, then chat
- * below when the session is ready.
- */
 export default function SessionPage({
   params,
 }: {
@@ -76,7 +61,6 @@ export default function SessionPage({
         if (cancelled) return
         setState({ kind: "loaded", session: data })
 
-        // Re-poll every 2s while still processing.
         if (data.status === "processing") {
           timer = setTimeout(() => {
             void load()
@@ -102,18 +86,19 @@ export default function SessionPage({
   }, [id])
 
   return (
-    <main className="flex flex-col gap-6">
-      <nav className="flex items-center justify-between">
+    <main className="pz-fade-in flex min-h-[calc(100vh-5rem)] flex-col gap-6">
+      <nav className="flex items-center justify-between gap-4">
         <Link
           href="/"
-          className="inline-flex items-center gap-1 text-sm text-white/50 transition-all duration-200 hover:text-white"
+          className="group inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
           Back to sessions
         </Link>
-        <span className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-white/40">
+        <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[#71717a]">
           <Zap className="h-3 w-3 text-brand" />
-          PunchZero · Session {id.slice(0, 8)}
+          <span className="hidden sm:inline">PunchZero ·</span>
+          <span>Session {id.slice(0, 8)}</span>
         </span>
       </nav>
 
@@ -130,9 +115,7 @@ export default function SessionPage({
             errorMessage={state.session.errorMessage}
           />
 
-          {state.session.status === "processing" && (
-            <ProcessingNotice />
-          )}
+          {state.session.status === "processing" && <ProcessingNotice />}
 
           {state.session.status === "ready" && (
             <Chat sessionId={state.session.id} />
@@ -145,8 +128,8 @@ export default function SessionPage({
 
 function LoadingState() {
   return (
-    <div className="flex items-center justify-center gap-2 py-20 text-sm text-white/50">
-      <Loader2 className="h-4 w-4 animate-spin" />
+    <div className="flex flex-1 items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin text-brand" />
       Loading session…
     </div>
   )
@@ -154,14 +137,16 @@ function LoadingState() {
 
 function NotFoundState() {
   return (
-    <div className="rounded-xl border border-white/10 bg-[#111113] p-8 text-center">
-      <p className="font-medium text-white">Session not found</p>
-      <p className="mt-1 text-sm text-white/50">
+    <div className="rounded-xl border border-border bg-surface p-10 text-center">
+      <p className="font-heading text-base font-medium text-foreground">
+        Session not found
+      </p>
+      <p className="mt-2 text-sm text-muted-foreground">
         The session you&apos;re looking for doesn&apos;t exist or was removed.
       </p>
       <Link
         href="/"
-        className="mt-4 inline-block text-sm text-brand hover:underline"
+        className="mt-5 inline-block text-sm text-brand transition-colors hover:text-brand-hover hover:underline"
       >
         ← Back to uploads
       </Link>
@@ -171,19 +156,19 @@ function NotFoundState() {
 
 function ErrorState({ message }: { message: string }) {
   return (
-    <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-6">
+    <div className="rounded-xl border border-red-500/30 bg-red-500/[0.04] p-6">
       <div className="flex items-center gap-2 text-red-300">
         <AlertCircle className="h-4 w-4" />
         <p className="text-sm font-medium">Failed to load session</p>
       </div>
-      <p className="mt-2 text-xs text-red-300/80">{message}</p>
+      <p className="mt-2 text-xs leading-relaxed text-red-300/80">{message}</p>
     </div>
   )
 }
 
 function ProcessingNotice() {
   return (
-    <div className="flex items-center justify-center gap-3 rounded-xl border border-dashed border-white/10 bg-[#0f0f12] px-6 py-8 text-sm text-white/60">
+    <div className="flex items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-[#0f0f12] px-6 py-10 text-sm text-muted-foreground">
       <Loader2 className="h-4 w-4 animate-spin text-brand" />
       <span>
         Extracting electrical sheets and embedding text — this updates every

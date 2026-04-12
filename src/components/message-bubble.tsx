@@ -1,3 +1,4 @@
+// VISUAL UPDATE: rounded-br-sm user tail, inline citation pills with brand ring, sources footer with thin divider, pz-fade-in on mount, streaming cursor support
 "use client"
 
 import { Loader2 } from "lucide-react"
@@ -10,6 +11,7 @@ export interface MessageBubbleProps {
   content: string
   citedSheets?: string[]
   pending?: boolean
+  streaming?: boolean
   createdAt?: string
 }
 
@@ -37,7 +39,7 @@ function renderContent(text: string): React.ReactNode[] {
     out.push(
       <span
         key={`cite-${key++}`}
-        className="mx-0.5 inline-flex items-center rounded border border-brand/40 bg-brand/15 px-1.5 py-0.5 font-mono text-[11px] font-medium text-brand align-baseline"
+        className="mx-0.5 inline-flex items-center rounded-md border border-brand/40 bg-brand/15 px-1.5 py-[1px] align-baseline font-mono text-[11px] font-semibold text-brand ring-1 ring-inset ring-brand/20"
       >
         {canonical}
       </span>,
@@ -61,24 +63,12 @@ function formatTime(iso?: string): string | undefined {
   })
 }
 
-/**
- * Single chat message bubble.
- *
- * User messages are right-aligned on a brand-blue fill; assistant
- * messages are left-aligned on the surface-lighter color with a border.
- * Assistant content runs through `renderContent`, which inline-badges
- * sheet references, and shows a source footer listing every cited
- * sheet the server (or the optimistic client regex) extracted.
- *
- * When `pending` is true — the placeholder bubble we insert while the
- * stream first-token latency is in flight — the bubble renders a spinner
- * and "Thinking…" instead of the empty content.
- */
 export function MessageBubble({
   role,
   content,
   citedSheets,
   pending = false,
+  streaming = false,
   createdAt,
 }: MessageBubbleProps) {
   const isUser = role === "user"
@@ -86,24 +76,28 @@ export function MessageBubble({
 
   return (
     <div
-      className={cn("group flex w-full", isUser ? "justify-end" : "justify-start")}
+      className={cn(
+        "pz-fade-in group flex w-full",
+        isUser ? "justify-end" : "justify-start",
+      )}
     >
       <div
         className={cn(
-          "relative max-w-[85%] rounded-xl px-4 py-2.5 text-sm leading-relaxed transition-all duration-200",
+          "relative max-w-[85%] px-4 py-3 text-[14px] leading-relaxed transition-all duration-200 sm:max-w-[80%]",
           isUser
-            ? "bg-brand text-white"
-            : "border border-white/10 bg-[#1a1a1e] text-white/90",
+            ? "rounded-2xl rounded-br-sm bg-brand text-foreground shadow-[0_1px_0_0_rgba(255,255,255,0.1)_inset]"
+            : "rounded-2xl rounded-bl-sm border border-border bg-surface-elevated text-foreground",
         )}
       >
         {pending ? (
-          <div className="flex items-center gap-2 text-white/60">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
-            <span>Thinking…</span>
+            <span className="text-sm">Thinking…</span>
           </div>
         ) : (
           <div className="whitespace-pre-wrap break-words">
             {isUser ? content : renderContent(content)}
+            {streaming && <span className="pz-cursor" aria-hidden="true" />}
           </div>
         )}
 
@@ -111,14 +105,14 @@ export function MessageBubble({
           !pending &&
           citedSheets &&
           citedSheets.length > 0 && (
-            <div className="mt-2 flex flex-wrap items-center gap-1 border-t border-white/10 pt-2">
-              <span className="mr-1 text-[10px] uppercase tracking-wider text-white/40">
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border pt-2.5">
+              <span className="mr-1 font-mono text-[9px] uppercase tracking-[0.14em] text-[#71717a]">
                 Sources
               </span>
               {citedSheets.map((s) => (
                 <span
                   key={s}
-                  className="rounded border border-brand/30 bg-brand/10 px-1.5 py-0.5 font-mono text-[10px] text-brand"
+                  className="rounded border border-brand/25 bg-brand/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-brand"
                 >
                   {s}
                 </span>
@@ -129,7 +123,7 @@ export function MessageBubble({
         {time && (
           <span
             className={cn(
-              "pointer-events-none absolute -bottom-4 text-[10px] text-white/30 opacity-0 transition-opacity group-hover:opacity-100",
+              "pointer-events-none absolute -bottom-4 font-mono text-[10px] text-[#52525b] opacity-0 transition-opacity group-hover:opacity-100",
               isUser ? "right-1" : "left-1",
             )}
           >

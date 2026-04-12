@@ -1,3 +1,4 @@
+// VISUAL UPDATE: flex-grow chat panel, thin custom scrollbar, polished composer with focus ring, hover-fill suggested chips, subtle separator between feed and composer
 "use client"
 
 import { Loader2, Send, Sparkles } from "lucide-react"
@@ -29,12 +30,6 @@ const SUGGESTED_QUESTIONS = [
 
 const CLIENT_CITATION_PATTERN = /\bE[-.]?(\d{3,4})\b/gi
 
-/**
- * Parse citations from streaming text on the client so the "Sources"
- * row on the assistant bubble updates live. Matches the server-side
- * `extractCitedSheets` regex in `lib/ai/chat.ts` so the final client
- * render and the server-persisted `citedSheets` stay in sync.
- */
 function extractCitationsClient(text: string): string[] {
   if (!text) return []
   const seen = new Set<string>()
@@ -51,20 +46,6 @@ function extractCitationsClient(text: string): string[] {
   return out
 }
 
-/**
- * Chat panel for a ready session.
- *
- * Responsibilities:
- *   - On mount, fetch existing history from `/api/session/[id]/messages`
- *     so revisiting a session restores the full thread.
- *   - Send new turns to `/api/session/[id]/chat`, reading the streamed
- *     response chunk-by-chunk through `Response.body.getReader()`.
- *   - Maintain an optimistic local message list that updates on every
- *     decoded chunk, then reconcile against the server's canonical
- *     message list after the stream closes.
- *   - Auto-scroll on new content, keyboard shortcuts (Enter sends,
- *     Shift+Enter newline), and suggested starter questions when empty.
- */
 export function Chat({ sessionId, className }: ChatProps) {
   const [messages, setMessages] = React.useState<ChatMessage[]>([])
   const [input, setInput] = React.useState("")
@@ -74,7 +55,6 @@ export function Chat({ sessionId, className }: ChatProps) {
   const scrollRef = React.useRef<HTMLDivElement>(null)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
 
-  // Load history on mount.
   React.useEffect(() => {
     let cancelled = false
     void (async () => {
@@ -88,7 +68,7 @@ export function Chat({ sessionId, className }: ChatProps) {
           setMessages(data.messages)
         }
       } catch {
-        // non-fatal; user can still start a fresh conversation
+        /* non-fatal */
       }
     })()
     return () => {
@@ -96,14 +76,12 @@ export function Chat({ sessionId, className }: ChatProps) {
     }
   }, [sessionId])
 
-  // Auto-scroll as new content streams in.
   React.useEffect(() => {
     const el = scrollRef.current
     if (!el) return
     el.scrollTop = el.scrollHeight
   }, [messages])
 
-  // Auto-grow the textarea up to a cap.
   React.useEffect(() => {
     const el = textareaRef.current
     if (!el) return
@@ -111,8 +89,6 @@ export function Chat({ sessionId, className }: ChatProps) {
     el.style.height = Math.min(el.scrollHeight, 160) + "px"
   }, [input])
 
-  // Focus the composer on mount so a user can start typing without
-  // an extra click, and re-focus it whenever a streaming turn wraps up.
   React.useEffect(() => {
     textareaRef.current?.focus()
   }, [])
@@ -192,7 +168,6 @@ export function Chat({ sessionId, className }: ChatProps) {
           })
         }
 
-        // Flush any trailing bytes sitting in the decoder.
         buffer += decoder.decode()
         setMessages((prev) => {
           const copy = [...prev]
@@ -208,7 +183,6 @@ export function Chat({ sessionId, className }: ChatProps) {
           return copy
         })
 
-        // Reconcile with server-canonical rows (real IDs, parsed citations).
         void fetch(`/api/session/${sessionId}/messages`, { cache: "no-store" })
           .then((r) => (r.ok ? r.json() : null))
           .then((data: { messages?: ChatMessage[] } | null) => {
@@ -219,7 +193,6 @@ export function Chat({ sessionId, className }: ChatProps) {
           .catch(() => {})
       } catch (err) {
         setError(err instanceof Error ? err.message : "Chat failed")
-        // Drop the failed placeholder assistant bubble; keep user turn.
         setMessages((prev) => prev.filter((m) => m.id !== tempAssistantId))
       } finally {
         setIsLoading(false)
@@ -237,15 +210,18 @@ export function Chat({ sessionId, className }: ChatProps) {
   }
 
   return (
-    <section className={cn("flex flex-col gap-3", className)}>
-      <h2 className="font-heading text-sm font-medium uppercase tracking-wider text-white/50">
-        Chat
-      </h2>
+    <section className={cn("flex min-h-0 flex-1 flex-col gap-3", className)}>
+      <div className="flex items-center gap-3">
+        <h2 className="font-heading text-[11px] font-medium uppercase tracking-[0.14em] text-[#71717a]">
+          Chat
+        </h2>
+        <div className="h-px flex-1 bg-border" />
+      </div>
 
-      <div className="flex min-h-[540px] flex-col overflow-hidden rounded-xl border border-white/10 bg-[#111113]">
+      <div className="flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-[0_1px_0_0_rgba(255,255,255,0.03)_inset]">
         <div
           ref={scrollRef}
-          className="flex-1 space-y-4 overflow-y-auto px-4 py-5"
+          className="pz-scroll flex-1 space-y-5 overflow-y-auto px-5 py-6 sm:px-6"
         >
           {messages.length === 0 ? (
             <EmptyState
@@ -267,19 +243,26 @@ export function Chat({ sessionId, className }: ChatProps) {
                   m.role === "assistant" &&
                   m.content.length === 0
                 }
+                streaming={
+                  isStreaming &&
+                  idx === messages.length - 1 &&
+                  m.role === "assistant" &&
+                  m.content.length > 0
+                }
               />
             ))
           )}
         </div>
 
         {error && (
-          <div className="border-t border-red-500/20 bg-red-500/5 px-4 py-2 text-xs text-red-300">
+          <div className="flex items-center gap-2 border-t border-red-500/20 bg-red-500/[0.04] px-4 py-2 text-xs text-red-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
             {error}
           </div>
         )}
 
         <form
-          className="flex items-end gap-2 border-t border-white/10 bg-[#0f0f12] p-3"
+          className="flex items-end gap-2 border-t border-border bg-[#0f0f12] p-3 sm:p-4"
           onSubmit={(e) => {
             e.preventDefault()
             void sendMessage(input)
@@ -293,12 +276,12 @@ export function Chat({ sessionId, className }: ChatProps) {
             onKeyDown={onKeyDown}
             placeholder="Ask about the electrical scope…"
             disabled={isLoading}
-            className="flex-1 resize-none rounded-lg border border-white/10 bg-[#1a1a1e] px-3 py-2 text-sm text-white placeholder:text-white/30 transition-all duration-200 focus:border-brand/60 focus:outline-none focus:ring-1 focus:ring-brand/40 disabled:opacity-60"
+            className="pz-scroll flex-1 resize-none rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-foreground placeholder:text-[#52525b] transition-all duration-150 focus:border-brand/60 focus:outline-none focus:ring-2 focus:ring-brand/30 disabled:opacity-60"
           />
           <Button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="h-9 bg-brand text-white transition-all duration-200 hover:bg-brand-dark disabled:bg-brand/40"
+            className="h-10 min-w-[44px] bg-brand px-3.5 text-foreground shadow-[0_1px_0_0_rgba(255,255,255,0.1)_inset] transition-colors hover:bg-brand-hover disabled:bg-[#1f2937] disabled:text-[#52525b]"
             aria-label="Send message"
           >
             {isLoading ? (
@@ -310,9 +293,15 @@ export function Chat({ sessionId, className }: ChatProps) {
         </form>
       </div>
 
-      <p className="text-[11px] text-white/30">
-        Enter to send · Shift+Enter for a new line. Answers are grounded in
-        the extracted electrical sheets.
+      <p className="flex items-center gap-1.5 px-0.5 text-[11px] text-[#52525b]">
+        <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+          Enter
+        </kbd>
+        to send ·
+        <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+          Shift+Enter
+        </kbd>
+        for a new line. Answers are grounded in the extracted electrical sheets.
       </p>
     </section>
   )
@@ -320,15 +309,15 @@ export function Chat({ sessionId, className }: ChatProps) {
 
 function EmptyState({ onPick }: { onPick: (q: string) => void }) {
   return (
-    <div className="flex flex-col items-center gap-5 py-10">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand/10 text-brand ring-1 ring-brand/30">
-        <Sparkles className="h-5 w-5" />
+    <div className="pz-fade-in flex flex-col items-center gap-6 py-12">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-brand/25 bg-brand/10 text-brand shadow-[0_0_40px_-10px_rgba(59,130,246,0.4)]">
+        <Sparkles className="h-6 w-6" />
       </div>
       <div className="text-center">
-        <p className="text-sm font-medium text-white">
+        <p className="font-heading text-[15px] font-medium text-foreground">
           Ask anything about this drawing set
         </p>
-        <p className="mt-1 text-xs text-white/50">
+        <p className="mt-1.5 text-sm text-muted-foreground">
           Answers are grounded in the extracted electrical sheets with
           citations back to the source.
         </p>
@@ -339,7 +328,7 @@ function EmptyState({ onPick }: { onPick: (q: string) => void }) {
             key={q}
             type="button"
             onClick={() => onPick(q)}
-            className="rounded-full border border-white/10 bg-[#1a1a1e] px-3 py-1.5 text-xs text-white/80 transition-all duration-200 hover:border-brand/50 hover:bg-[#14141a] hover:text-white"
+            className="rounded-full border border-border bg-surface-elevated px-3.5 py-1.5 text-xs text-muted-foreground transition-all duration-150 hover:border-brand/40 hover:bg-brand/10 hover:text-foreground"
           >
             {q}
           </button>

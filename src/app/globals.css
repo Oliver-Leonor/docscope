@@ -1,3 +1,4 @@
+/* VISUAL UPDATE: refined dark theme token system, named surface/border/brand/success tokens, fade-in + lift utilities */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -5,46 +6,84 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* ============================================================
+     Typography
+     ============================================================ */
   --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo,
     monospace;
   --font-heading: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+
+  /* ============================================================
+     PunchZero brand palette (referenced by bg-brand / text-brand
+     / border-brand throughout the app)
+     ============================================================ */
   --color-brand: #3b82f6;
-  --color-brand-dark: #1e40af;
+  --color-brand-hover: #2563eb;
+  --color-brand-dark: #2563eb; /* legacy alias kept for older classes */
+
+  /* ============================================================
+     Semantic surfaces — four-tier depth scale
+         surface           cards, primary containers
+         surface-elevated  elevated cards, inputs, nested rows
+         surface-hover     hover state for interactive rows
+         surface-sunken    contrast sink (below cards)
+     ============================================================ */
   --color-surface: #111113;
-  --color-surface-light: #1a1a1e;
-  --color-surface-lighter: #242429;
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
+  --color-surface-elevated: #1a1a1e;
+  --color-surface-hover: #242429;
+  --color-surface-sunken: #0f0f12;
+
+  /* ============================================================
+     Borders — subtle (default) vs strong (hover, emphasis)
+     ============================================================ */
+  --color-border-subtle: #27272a;
+  --color-border-strong: #3f3f46;
+
+  /* ============================================================
+     Status colors
+     ============================================================ */
+  --color-success: #22c55e;
+  --color-success-muted: rgba(34, 197, 94, 0.1);
+
+  /* ============================================================
+     Shadcn token bridges — these alias the CSS variables set in
+     `.dark` below so every shadcn primitive (Button, Dialog,
+     Badge, etc.) picks up our palette automatically.
+     ============================================================ */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
   --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Radii (preserve shadcn's scale) */
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -55,6 +94,8 @@
 }
 
 :root {
+  /* Light mode kept at shadcn defaults (we run `.dark` by default,
+     but shipping both means system preference still works). */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -90,47 +131,152 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* Refined dark palette — exact hex values so what designers and
+     engineers see in Figma/devtools matches the spec 1:1. */
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #111113;
+  --card-foreground: #fafafa;
+  --popover: #111113;
+  --popover-foreground: #fafafa;
+  --primary: #3b82f6;
+  --primary-foreground: #fafafa;
+  --secondary: #1a1a1e;
+  --secondary-foreground: #fafafa;
+  --muted: #1a1a1e;
+  --muted-foreground: #a1a1aa;
+  --accent: #242429;
+  --accent-foreground: #fafafa;
+  --destructive: #ef4444;
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #3b82f6;
+  --chart-1: #3b82f6;
+  --chart-2: #22c55e;
+  --chart-3: #a855f7;
+  --chart-4: #f59e0b;
+  --chart-5: #ef4444;
+  --sidebar: #111113;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-accent: #1a1a1e;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #27272a;
+  --sidebar-ring: #3b82f6;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
     @apply font-sans;
   }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  /* Tabular numbers everywhere mono runs, so circuit numbers and
+     schedule values line up without jitter. */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Thin scroll bars inside scroll containers so the chat feed
+     doesn't look like a WinXP dialog. */
+  .pz-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .pz-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .pz-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .pz-scroll::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 8px;
+  }
+  .pz-scroll::-webkit-scrollbar-thumb:hover {
+    background: #3f3f46;
+  }
+}
+
+/* ============================================================
+   Page-load fade — ~400ms drift-up for page containers
+   ============================================================ */
+@keyframes punchzero-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pz-fade-in {
+  animation: punchzero-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Stagger children by declaring --pz-delay on a child */
+.pz-fade-in-up {
+  animation: punchzero-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--pz-delay, 0ms);
+}
+
+/* ============================================================
+   Interactive card lift — subtle translate + border shift
+   ============================================================ */
+.pz-lift {
+  transition: transform 200ms ease, border-color 200ms ease,
+    background-color 200ms ease, box-shadow 200ms ease;
+}
+.pz-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px -8px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================================
+   Soft pulse for status indicators (gentler than animate-pulse)
+   ============================================================ */
+@keyframes punchzero-soft-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.pz-soft-pulse {
+  animation: punchzero-soft-pulse 2s ease-in-out infinite;
+}
+
+/* ============================================================
+   Streaming cursor — thin bar that blinks after the last token
+   ============================================================ */
+@keyframes punchzero-cursor-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+.pz-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  vertical-align: text-bottom;
+  background: currentColor;
+  margin-left: 2px;
+  animation: punchzero-cursor-blink 1s steps(1) infinite;
 }
