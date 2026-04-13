@@ -1,5 +1,5 @@
 import OpenAI from "openai"
-import { PDFParse } from "pdf-parse"
+import { PDFDocument } from "pdf-lib"
 
 import { withRetry } from "../ai/retry"
 import { extractTextPerPage } from "./extract"
@@ -12,14 +12,6 @@ export interface IdentifiedSheet {
 }
 
 const VISION_MODEL = "gpt-4o-mini"
-/**
- * Rasterization width for vision calls. 2000px is wide enough that small
- * schedule values, circuit numbers, and title-block callouts remain
- * legible to the model. 1200px — what we previously used for identification
- * — was enough to read title blocks but lost too much detail on panel
- * schedules and wire tables.
- */
-const VISION_WIDTH = 2000
 const VISION_MAX_TOKENS = 4000
 
 /**
@@ -43,33 +35,44 @@ const EXTRACTION_CHECKLIST = `- Panel schedule data (panel names, ratings, circu
  * The strategy has two phases, but they serve different goals:
  *
  *   Phase 1 — IDENTIFICATION (cheap text-based).
- *     Run pdf-parse text extraction on every page and regex-scan for
+ *     Run unpdf text extraction on every page and regex-scan for
  *     `E-xxx`. Pages with a text match are immediately confirmed as
  *     electrical sheets. Pages with less than 100 characters of text
  *     and no match are queued as vision identification candidates
  *     (these are usually scanned/image-only drawings).
  *
  *   Phase 2 — CONTENT EXTRACTION (always vision).
- *     Every confirmed electrical sheet goes through a thorough
- *     `gpt-4o-mini` vision call at 2000px width. Construction drawings
- *     are inherently visual — panel schedules, single-line diagrams,
- *     equipment schedules, wire tables, and title-block notes are
- *     rendered as graphics, not selectable text, so pdf-parse recovers
- *     almost nothing useful from them. pdf-parse's text layer is good
- *     enough to *find* which pages are electrical (the sheet number
- *     itself is usually in the vector layer) but not to *understand*
- *     them. Accepting the vision cost (~$0.01–$0.02/page, ~$0.10–$0.20
- *     for a typical 7-sheet set) is well worth the accuracy gain.
+ *     Every confirmed electrical sheet is split out as its own
+ *     single-page PDF and sent to `gpt-4o-mini` via OpenAI's native
+ *     PDF file input. The model gets BOTH the embedded text layer and
+ *     a high-resolution rendering of the page, so it can read panel
+ *     schedules, single-line diagrams, equipment schedules, wire
+ *     tables, and title-block notes that are rendered as graphics
+ *     (which our text-only pass can't recover). Accepting the vision
+ *     cost (~$0.01–$0.02/page, ~$0.10–$0.20 for a typical 7-sheet set)
+ *     is well worth the accuracy gain.
+ *
+ * Why send PDFs instead of rasterizing first:
+ *   - Vercel serverless has no `DOMMatrix` / `Path2D` / `ImageData`,
+ *     so anything that tries to render PDF.js into a canvas blows up
+ *     at module load. `pdf-img-convert`, raw `pdfjs-dist`, and
+ *     `pdf-parse`'s `getScreenshot` all fail in that environment.
+ *   - OpenAI's chat completions API accepts `type: "file"` content
+ *     parts with a base64 `data:application/pdf;base64,...` payload
+ *     and renders pages internally on a vision-capable model
+ *     (`gpt-4o`, `gpt-4o-mini`, `o1`). That moves the rasterization
+ *     out of our serverless function entirely.
+ *   - Single-page PDF extraction with `pdf-lib` is pure JS, has no
+ *     native deps, and works on any runtime.
  *
  * Vision calls are run in parallel via `Promise.all` so the wall-clock
  * cost scales with the slowest single sheet instead of the total
- * sheet count. Rasterization is batched into a single pdf-parse pass
- * so pdfjs-dist + @napi-rs/canvas are only set up once per upload.
+ * sheet count.
  *
  * Every returned sheet is marked `extractionMethod: "vision"` unless a
  * specific vision call failed — in which case we gracefully fall back
- * to whatever pdf-parse recovered and mark that one sheet as `"text"`
- * so the cover page shows the user what happened.
+ * to whatever unpdf recovered and mark that one sheet as `"text"` so
+ * the cover page shows the user what happened.
  */
 export async function identifyElectricalSheets(
   pdfBuffer: Buffer,
@@ -96,12 +99,12 @@ export async function identifyElectricalSheets(
   }
 
   // Graceful degradation when no OpenAI key is configured: return the
-  // text-confirmed sheets with whatever pdf-parse recovered, and drop
+  // text-confirmed sheets with whatever unpdf recovered, and drop
   // vision candidates entirely.
   if (!process.env.OPENAI_API_KEY) {
     console.warn(
       "[identify-sheets] OPENAI_API_KEY not set — skipping vision extraction, " +
-        "falling back to pdf-parse text for content",
+        "falling back to text-layer extraction for content",
     )
     return textConfirmed
       .map(({ pageIndex, sheetNumber }) => ({
@@ -114,23 +117,28 @@ export async function identifyElectricalSheets(
       .sort((a, b) => a.pageIndex - b.pageIndex)
   }
 
-  // Rasterize every page we need in a single pdf-parse pass.
-  const pagesToRasterize = Array.from(
+  // Split out every page we need as its own single-page PDF (base64
+  // data URI), ready to drop straight into an OpenAI `type: "file"`
+  // content part.
+  const pagesToExtract = Array.from(
     new Set([
       ...textConfirmed.map((t) => t.pageIndex),
       ...visionCandidates,
     ]),
   ).sort((a, b) => a - b)
-  const rasterized = await rasterizePages(pdfBuffer, pagesToRasterize)
+  const singlePagePdfs = await extractPagesAsPdfDataUris(
+    pdfBuffer,
+    pagesToExtract,
+  )
 
   const openai = new OpenAI()
 
   // Phase 2a: thorough content extraction for text-confirmed sheets.
   const contentPromises = textConfirmed.map(
     async ({ pageIndex, sheetNumber }): Promise<IdentifiedSheet> => {
-      const base64 = rasterized.get(pageIndex)
-      if (!base64) {
-        // Rasterization failed for this page — fall back to pdf-parse text.
+      const dataUri = singlePagePdfs.get(pageIndex)
+      if (!dataUri) {
+        // Page extraction failed — fall back to text-layer text.
         return {
           pageIndex,
           sheetNumber,
@@ -141,8 +149,9 @@ export async function identifyElectricalSheets(
       }
       try {
         const extractedText = await visionExtractContent(
-          base64,
+          dataUri,
           sheetNumber,
+          pageIndex,
           openai,
         )
         return {
@@ -170,10 +179,14 @@ export async function identifyElectricalSheets(
   // Phase 2b: combined identify + extract for vision-only candidates.
   const candidatePromises = visionCandidates.map(
     async (pageIndex): Promise<IdentifiedSheet | null> => {
-      const base64 = rasterized.get(pageIndex)
-      if (!base64) return null
+      const dataUri = singlePagePdfs.get(pageIndex)
+      if (!dataUri) return null
       try {
-        const result = await visionIdentifyAndExtract(base64, openai)
+        const result = await visionIdentifyAndExtract(
+          dataUri,
+          pageIndex,
+          openai,
+        )
         if (!result.sheetNumber) return null
         return {
           pageIndex,
@@ -228,56 +241,64 @@ export function findSheetNumber(text: string): string | null {
 }
 
 /**
- * Rasterize a set of PDF pages in a single pdf-parse pass at
- * `VISION_WIDTH`. Returns a map of 0-indexed `pageIndex` → base64 PNG
- * string, ready to drop into an OpenAI vision `image_url` data URL.
+ * Split a multi-page PDF into a map of `pageIndex` → single-page PDF
+ * encoded as a `data:application/pdf;base64,...` URI, ready to feed to
+ * an OpenAI `type: "file"` content block.
  *
- * pdf-parse's `getScreenshot` accepts `partial: number[]` of 1-indexed
- * page numbers and returns `{ pages: Screenshot[] }` where each page has
- * its own `pageNumber`. We translate back to 0-indexed for the map key
- * so callers can match against the identifier in our schema.
+ * Uses `pdf-lib` (pure JS, no native deps) so it runs cleanly inside a
+ * Vercel serverless function — no canvas, no DOMMatrix, no WASM. We
+ * load the source document once and copy each requested page into its
+ * own throwaway `PDFDocument`, then base64-encode that page-PDF.
+ *
+ * Per-page failures are isolated so one corrupt page can't take down
+ * the whole upload — a missing entry in the returned map causes the
+ * caller to fall back to the page's text-layer extraction.
  */
-async function rasterizePages(
+async function extractPagesAsPdfDataUris(
   pdfBuffer: Buffer,
   pageIndices: number[],
 ): Promise<Map<number, string>> {
   if (pageIndices.length === 0) return new Map()
 
-  const parser = new PDFParse({ data: new Uint8Array(pdfBuffer) })
-  try {
-    const shot = await parser.getScreenshot({
-      partial: pageIndices.map((i) => i + 1),
-      desiredWidth: VISION_WIDTH,
-      imageBuffer: true,
-      imageDataUrl: false,
-    })
-    const out = new Map<number, string>()
-    for (const page of shot.pages) {
-      if (page?.data?.byteLength) {
-        out.set(
-          page.pageNumber - 1,
-          Buffer.from(page.data).toString("base64"),
-        )
-      }
+  const srcDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true })
+  const out = new Map<number, string>()
+
+  for (const pageIndex of pageIndices) {
+    try {
+      const pageDoc = await PDFDocument.create()
+      const [copied] = await pageDoc.copyPages(srcDoc, [pageIndex])
+      pageDoc.addPage(copied)
+      const dataUri = await pageDoc.saveAsBase64({ dataUri: true })
+      out.set(pageIndex, dataUri)
+    } catch (err) {
+      console.error(
+        `[identify-sheets] failed to extract page ${pageIndex} as PDF:`,
+        err,
+      )
     }
-    return out
-  } finally {
-    await parser.destroy().catch(() => {})
   }
+
+  return out
 }
 
 /**
  * Thorough content extraction on a page we already know is electrical.
- * The prompt names the sheet number inline so the model has context for
- * where values like panel tags and circuit numbers "belong."
+ * Sends the single-page PDF to `gpt-4o-mini` via OpenAI's native PDF
+ * `type: "file"` input — the model receives both the embedded text
+ * layer and a vision rendering of the page, which is what we need to
+ * read panel schedules, schedules, and title-block notes.
+ *
+ * The prompt names the sheet number inline so the model has context
+ * for where values like panel tags and circuit numbers "belong."
  *
  * Returns the raw extracted text (possibly empty if the model has
  * nothing to report). Throws on API errors so the caller can degrade
- * gracefully to pdf-parse text for this one sheet.
+ * gracefully to text-layer extraction for this one sheet.
  */
 async function visionExtractContent(
-  base64: string,
+  pdfDataUri: string,
   sheetNumber: string,
+  pageIndex: number,
   openai: OpenAI,
 ): Promise<string> {
   const prompt = `This is an electrical construction drawing (Sheet ${sheetNumber}). Extract ALL readable text, labels, values, specifications, and data from this drawing. Include:
@@ -288,17 +309,17 @@ Format the extracted content as structured text, preserving table structures whe
   const response = await withRetry(() =>
     openai.chat.completions.create({
       model: VISION_MODEL,
-      max_tokens: VISION_MAX_TOKENS,
+      max_completion_tokens: VISION_MAX_TOKENS,
       messages: [
         {
           role: "user",
           content: [
             { type: "text", text: prompt },
             {
-              type: "image_url",
-              image_url: {
-                url: `data:image/png;base64,${base64}`,
-                detail: "high",
+              type: "file",
+              file: {
+                filename: `sheet-${pageIndex + 1}.pdf`,
+                file_data: pdfDataUri,
               },
             },
           ],
@@ -311,16 +332,18 @@ Format the extracted content as structured text, preserving table structures whe
 }
 
 /**
- * Combined identify + extract for pages where pdf-parse recovered too
- * little text for the regex pass. The model is asked to read the title
- * block first and only produce extracted content when the sheet number
- * starts with `E`. Uses JSON mode so the reply is machine-parseable.
+ * Combined identify + extract for pages where the text layer recovered
+ * too little to run the regex pass. The model is asked to read the
+ * title block first and only produce extracted content when the sheet
+ * number starts with `E`. Uses JSON mode so the reply is
+ * machine-parseable.
  *
  * Sheet numbers returned by the model are re-run through
  * `findSheetNumber` to enforce canonical `E-XXX` form.
  */
 async function visionIdentifyAndExtract(
-  base64: string,
+  pdfDataUri: string,
+  pageIndex: number,
   openai: OpenAI,
 ): Promise<{ sheetNumber: string | null; extractedText: string }> {
   const prompt = `This is a construction drawing. First, look at the title block and determine the sheet number. Then, if and only if the sheet number starts with the letter E (indicating an electrical sheet), extract ALL readable text, labels, values, specifications, and data from the drawing. Include:
@@ -336,7 +359,7 @@ Respond with a single JSON object in this exact shape:
   const response = await withRetry(() =>
     openai.chat.completions.create({
       model: VISION_MODEL,
-      max_tokens: VISION_MAX_TOKENS,
+      max_completion_tokens: VISION_MAX_TOKENS,
       response_format: { type: "json_object" },
       messages: [
         {
@@ -344,10 +367,10 @@ Respond with a single JSON object in this exact shape:
           content: [
             { type: "text", text: prompt },
             {
-              type: "image_url",
-              image_url: {
-                url: `data:image/png;base64,${base64}`,
-                detail: "high",
+              type: "file",
+              file: {
+                filename: `sheet-${pageIndex + 1}.pdf`,
+                file_data: pdfDataUri,
               },
             },
           ],

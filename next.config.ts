@@ -1,16 +1,11 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  // Native + pdfjs-heavy packages must run un-bundled on the server so their
-  // dynamic requires (wasm, node-canvas bindings, sharp's libvips) resolve.
-  serverExternalPackages: [
-    "pdf-parse",
-    "pdfjs-dist",
-    "@napi-rs/canvas",
-    "canvas",
-    "sharp",
-    "pdf-lib",
-  ],
+  // pdf-lib is pure JS but ships large CJS bundles that webpack will
+  // happily try to inline; keeping it external makes the function
+  // bundle smaller and avoids accidental tree-shake breakage when
+  // pdf-lib internals reach for things at runtime.
+  serverExternalPackages: ["pdf-lib"],
 }
 
 export default nextConfig
