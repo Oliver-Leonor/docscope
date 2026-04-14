@@ -1,4 +1,3 @@
-// VISUAL UPDATE: semantic tokens, tightened type hierarchy, pz-fade-in on mount
 "use client"
 
 import { AlertTriangle, RotateCcw } from "lucide-react"
@@ -18,7 +17,7 @@ export default function RootError({
   }, [error])
 
   return (
-    <main className="pz-fade-in flex min-h-[60vh] flex-col items-center justify-center gap-6 text-center">
+    <main className="ds-fade-in flex min-h-[60vh] flex-col items-center justify-center gap-6 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 text-red-300 ring-1 ring-red-500/30">
         <AlertTriangle className="h-6 w-6" />
       </div>

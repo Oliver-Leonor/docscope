@@ -1,4 +1,3 @@
-// VISUAL UPDATE: removed hard-coded body colors, added gradient backdrop + subtle radial accent, max-width 1200px container
 import type { Metadata } from "next"
 import { DM_Sans, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
@@ -15,9 +14,9 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 })
 
-const siteName = "PunchZero — Electrical PDF QA"
+const siteName = "DocScope — AI Document Intelligence"
 const siteDescription =
-  "Upload construction drawing sets, automatically identify the electrical sheets, and query their contents with citations back to the source."
+  "Upload any PDF. Ask questions. Get answers with page-level citations."
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -25,24 +24,24 @@ export const metadata: Metadata = {
   ),
   title: {
     default: siteName,
-    template: "%s · PunchZero",
+    template: "%s · DocScope",
   },
   description: siteDescription,
-  applicationName: "PunchZero",
+  applicationName: "DocScope",
   keywords: [
-    "electrical drawings",
-    "construction documents",
-    "PDF QA",
+    "document intelligence",
+    "pdf question answering",
     "RAG",
     "pgvector",
-    "punchzero",
+    "OpenAI",
+    "docscope",
   ],
-  authors: [{ name: "PunchZero" }],
+  authors: [{ name: "DocScope" }],
   openGraph: {
     type: "website",
     title: siteName,
     description: siteDescription,
-    siteName: "PunchZero",
+    siteName: "DocScope",
     locale: "en_US",
   },
   twitter: {
@@ -70,8 +69,6 @@ export default function RootLayout({
       className={`dark ${dmSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="relative min-h-full bg-background text-foreground font-sans">
-        {/* Subtle top-of-page radial glow — construction tool feel
-            without crossing into consumer-y territory. */}
         <div
           aria-hidden="true"
           className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(59,130,246,0.08),transparent_70%)]"

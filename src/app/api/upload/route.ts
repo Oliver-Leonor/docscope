@@ -4,11 +4,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { embedAndStoreChunks } from "@/lib/ai/embeddings"
 import { chunkText } from "@/lib/pdf/chunk"
-import { identifyElectricalSheets } from "@/lib/pdf/identify-sheets"
+import { identifyDocumentSections } from "@/lib/pdf/identify-sheets"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
-// Vercel Pro max; on hobby this is clamped to 60s automatically.
+// Vercel Pro max; on Hobby this is clamped to 60s automatically.
 export const maxDuration = 300
 
 /**
@@ -20,23 +20,13 @@ export const maxDuration = 300
  *   1. Parse multipart form; validate .pdf extension.
  *   2. Upload the raw bytes to Vercel Blob for persistence.
  *   3. Create a `Session` row in `processing` state.
- *   4. Run `identifyElectricalSheets` (text extraction + vision fallback).
- *   5. For each confirmed electrical page: insert a `Sheet` row, chunk
- *      its extracted text, embed those chunks, and persist to `Chunk`.
- *   6. Flip the session to `ready` (or `error` + `errorMessage` when no
- *      electrical sheets were found).
- *
- * Why inline instead of a background worker:
- *   - Typical drawing sets in this app are <100 pages.
- *   - A Vercel Pro function can run 300s; Hobby gets 60s. That covers the
- *     expected workload.
- *   - Simpler to debug than a Trigger.dev / Inngest setup.
- *   - For production scale this would move to a queue + worker.
- *
- * The client opens the session page immediately after the response
- * returns and polls `/api/session/[id]/status` for updates. Because we
- * process inline the status will already be `ready` by the time the
- * first poll lands — polling is still useful when processing fails.
+ *   4. Run `identifyDocumentSections` (text extraction + vision fallback
+ *      for low-text pages), which returns one labeled entry per page.
+ *   5. For each page: insert a `Sheet` row, chunk its extracted text,
+ *      embed those chunks, and persist them as `Chunk` rows with
+ *      pgvector embeddings.
+ *   6. Flip the session to `ready` (or `error` + `errorMessage` when
+ *      extraction recovered nothing at all).
  */
 export async function POST(request: NextRequest) {
   let sessionId: string | null = null
@@ -72,32 +62,32 @@ export async function POST(request: NextRequest) {
     })
     sessionId = session.id
 
-    const electricalSheets = await identifyElectricalSheets(buffer)
+    const sections = await identifyDocumentSections(buffer)
 
-    if (electricalSheets.length === 0) {
+    if (sections.length === 0) {
       await prisma.session.update({
         where: { id: session.id },
         data: {
           status: "error",
           errorMessage:
-            "No electrical sheets (E-xxx) were found in this PDF.",
+            "This PDF appears to be empty or could not be read.",
         },
       })
       return NextResponse.json({ sessionId: session.id })
     }
 
-    for (const sheet of electricalSheets) {
+    for (const section of sections) {
       const sheetRecord = await prisma.sheet.create({
         data: {
           sessionId: session.id,
-          sheetNumber: sheet.sheetNumber,
-          pageIndex: sheet.pageIndex,
-          extractedText: sheet.extractedText,
-          extractionMethod: sheet.extractionMethod,
+          sheetNumber: section.sectionLabel,
+          pageIndex: section.pageIndex,
+          extractedText: section.extractedText,
+          extractionMethod: section.extractionMethod,
         },
       })
 
-      const chunks = chunkText(sheet.extractedText, sheet.sheetNumber)
+      const chunks = chunkText(section.extractedText, section.sectionLabel)
       if (chunks.length > 0) {
         await embedAndStoreChunks(
           chunks.map((c) => ({

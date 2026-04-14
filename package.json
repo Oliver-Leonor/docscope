@@ -1,7 +1,8 @@
 {
-  "name": "electrical-pdf-qa",
+  "name": "docscope",
   "version": "0.1.0",
   "private": true,
+  "description": "AI-powered document intelligence — upload any PDF, ask questions, get cited answers",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

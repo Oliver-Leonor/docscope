@@ -1,4 +1,3 @@
-/* VISUAL UPDATE: refined dark theme token system, named surface/border/brand/success tokens, fade-in + lift utilities */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -15,7 +14,7 @@
   --font-heading: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
 
   /* ============================================================
-     PunchZero brand palette (referenced by bg-brand / text-brand
+     DocScope brand palette (referenced by bg-brand / text-brand
      / border-brand throughout the app)
      ============================================================ */
   --color-brand: #3b82f6;
@@ -186,22 +185,22 @@
   }
   /* Thin scroll bars inside scroll containers so the chat feed
      doesn't look like a WinXP dialog. */
-  .pz-scroll {
+  .ds-scroll {
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
   }
-  .pz-scroll::-webkit-scrollbar {
+  .ds-scroll::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
-  .pz-scroll::-webkit-scrollbar-track {
+  .ds-scroll::-webkit-scrollbar-track {
     background: transparent;
   }
-  .pz-scroll::-webkit-scrollbar-thumb {
+  .ds-scroll::-webkit-scrollbar-thumb {
     background: var(--border);
     border-radius: 8px;
   }
-  .pz-scroll::-webkit-scrollbar-thumb:hover {
+  .ds-scroll::-webkit-scrollbar-thumb:hover {
     background: #3f3f46;
   }
 }
@@ -209,7 +208,7 @@
 /* ============================================================
    Page-load fade — ~400ms drift-up for page containers
    ============================================================ */
-@keyframes punchzero-fade-in {
+@keyframes docscope-fade-in {
   from {
     opacity: 0;
     transform: translateY(6px);
@@ -220,24 +219,24 @@
   }
 }
 
-.pz-fade-in {
-  animation: punchzero-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+.ds-fade-in {
+  animation: docscope-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Stagger children by declaring --pz-delay on a child */
-.pz-fade-in-up {
-  animation: punchzero-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: var(--pz-delay, 0ms);
+/* Stagger children by declaring --ds-delay on a child */
+.ds-fade-in-up {
+  animation: docscope-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--ds-delay, 0ms);
 }
 
 /* ============================================================
    Interactive card lift — subtle translate + border shift
    ============================================================ */
-.pz-lift {
+.ds-lift {
   transition: transform 200ms ease, border-color 200ms ease,
     background-color 200ms ease, box-shadow 200ms ease;
 }
-.pz-lift:hover {
+.ds-lift:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 16px -8px rgba(0, 0, 0, 0.4);
 }
@@ -245,7 +244,7 @@
 /* ============================================================
    Soft pulse for status indicators (gentler than animate-pulse)
    ============================================================ */
-@keyframes punchzero-soft-pulse {
+@keyframes docscope-soft-pulse {
   0%,
   100% {
     opacity: 1;
@@ -254,14 +253,14 @@
     opacity: 0.45;
   }
 }
-.pz-soft-pulse {
-  animation: punchzero-soft-pulse 2s ease-in-out infinite;
+.ds-soft-pulse {
+  animation: docscope-soft-pulse 2s ease-in-out infinite;
 }
 
 /* ============================================================
    Streaming cursor — thin bar that blinks after the last token
    ============================================================ */
-@keyframes punchzero-cursor-blink {
+@keyframes docscope-cursor-blink {
   0%,
   49% {
     opacity: 1;
@@ -271,12 +270,12 @@
     opacity: 0;
   }
 }
-.pz-cursor {
+.ds-cursor {
   display: inline-block;
   width: 2px;
   height: 1em;
   vertical-align: text-bottom;
   background: currentColor;
   margin-left: 2px;
-  animation: punchzero-cursor-blink 1s steps(1) infinite;
+  animation: docscope-cursor-blink 1s steps(1) infinite;
 }

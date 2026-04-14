@@ -8,14 +8,6 @@ import { withRetry } from "./retry"
 const CHAT_MODEL = "gpt-4o-mini"
 const HISTORY_WINDOW = 10 // most recent turns included in the prompt
 const RETRIEVAL_TOP_K = 5
-/**
- * Cosine-similarity floor below which we treat the retrieval context
- * as "doesn't really cover this question" and nudge the model to lean
- * on general electrical-engineering knowledge instead of strictly
- * grounding. Tuned by eye — typical on-topic queries in our test set
- * score 0.35–0.55 against a good matching chunk.
- */
-const LOW_RELEVANCE_THRESHOLD = 0.3
 
 let _openai: OpenAI | null = null
 function openai(): OpenAI {
@@ -26,42 +18,24 @@ function openai(): OpenAI {
 /**
  * Generate a streaming chat response for a session.
  *
- * Two-tier answering strategy:
+ * Answering strategy:
  *
- *   Tier 1 — project grounding. Run pgvector cosine-similarity
- *     retrieval on the user's question, pack the top-K chunks into
- *     the system prompt, and ask the model to answer from them first.
- *     When the sheets contain the answer, it cites the source sheet
- *     inline (e.g. "According to sheet E-201…").
+ *   1. Run pgvector cosine-similarity retrieval on the user's question,
+ *      pack the top-K chunks into the system prompt, and ask the model
+ *      to answer from them first, citing the source page or section
+ *      inline (e.g. "According to Page 5..." or "According to A-201...").
  *
- *   Tier 2 — general-knowledge fallback. When the sheets don't cover
- *     the question, the model is allowed to supplement with its own
- *     electrical-engineering expertise, as long as it clearly flags
- *     what's from the drawings versus what's general guidance
- *     (code requirements, best practices, terminology).
+ *   2. If the retrieved chunks don't fully cover the question, the
+ *      model is allowed to supplement with general knowledge — but
+ *      must make clear what came from the document versus what is
+ *      general background.
  *
- * Low-relevance detection: if the best-matching chunk's similarity is
- * below {@link LOW_RELEVANCE_THRESHOLD} (or we got zero hits at all),
- * we still pass the chunks into the prompt but prepend a note telling
- * the model the context is unlikely to be helpful and it should lean
- * on general knowledge. This catches the common case where a user
- * asks a code-requirement or best-practices question that nothing in
- * the drawing set can answer.
- *
- * Completely off-topic questions (non-electrical, non-construction)
- * get a polite redirect — the prompt tells the model to steer back
- * to the project's electrical scope instead of answering.
+ *   3. Questions completely unrelated to the document's subject get a
+ *      polite redirect.
  *
  * Everything else — history window, user-message persistence,
  * streaming, assistant-message persistence, citation extraction — is
  * unchanged from the prior implementation.
- *
- * Why `gpt-4o-mini` over `gpt-4o`:
- *   - 15× cheaper ($0.15 vs $2.50 / 1M input tokens)
- *   - Fast first-token latency (<2s) for snappy chat UX
- *   - Retrieval grounds most answers, and general-knowledge fallback
- *     doesn't stretch beyond what `gpt-4o-mini` handles well
- *   - At 100 PDFs/day this saves ~$50/day
  */
 export async function generateChatResponse(
   sessionId: string,
@@ -85,43 +59,34 @@ export async function generateChatResponse(
     },
   })
 
-  // 3. Retrieve grounding chunks and judge their relevance.
+  // 3. Retrieve grounding chunks.
   const relevantChunks = await retrieveRelevantChunks(
     sessionId,
     userMessage,
     RETRIEVAL_TOP_K,
   )
-  const topSimilarity = relevantChunks[0]?.similarity ?? 0
-  const isLowRelevance =
-    relevantChunks.length === 0 || topSimilarity < LOW_RELEVANCE_THRESHOLD
 
   const contextBlock =
     relevantChunks.length === 0
-      ? "(no indexed electrical content matched this question)"
+      ? "(no indexed document content matched this question)"
       : relevantChunks
-          .map((c) => `[Source: Sheet ${c.sheetNumber}]\n${c.content}`)
+          .map((c) => `[Source: ${c.sheetNumber}]\n${c.content}`)
           .join("\n\n---\n\n")
 
-  // Inserted immediately above the sheet content when Tier-1 retrieval
-  // came back weak, so the model sees the warning in close proximity
-  // to the (likely unhelpful) chunks it's being offered.
-  const lowRelevanceNote = isLowRelevance
-    ? `NOTE: The extracted sheet content below has low relevance to this question. Use your general electrical engineering expertise to answer, and mention if any sheet content happens to be relevant.
-
-`
-    : ""
-
-  // 4. Build the two-tier system prompt.
-  const systemPrompt = `You are an expert electrical engineer assistant. You have access to extracted content from electrical construction drawings for this project.
+  const systemPrompt = `You are an expert document analyst assistant. You have access to extracted content from a PDF document uploaded by the user.
 
 ANSWERING STRATEGY:
-1. FIRST, try to answer using the provided electrical sheet content below. Always cite sheets when using this content (e.g., "According to sheet E-201...").
-2. If the sheet content doesn't contain enough information to fully answer the question, supplement with your general electrical engineering knowledge. When doing this, clearly distinguish between what comes from the project sheets vs. your general knowledge.
-   - For project-specific data (panel sizes, service voltage, conduit specs): cite the sheets.
-   - For general knowledge (code requirements, best practices, terminology explanations): you can answer directly but note it's general guidance, not from the project drawings.
-3. If the question is completely unrelated to electrical engineering or construction, politely redirect: "I'm specialized in electrical construction scope. Could you ask something about the electrical systems in this project?"
+1. FIRST, try to answer using the provided document content below. Always cite which page or section your information comes from (e.g., "According to Page 5..." or "According to section A-201...").
+2. If the document content doesn't fully answer the question, supplement with your general knowledge. Clearly distinguish between what comes from the document vs. your general knowledge.
+3. If the question is completely unrelated to the document's subject matter, politely note that and offer to help with document-related questions.
 
-${lowRelevanceNote}ELECTRICAL SHEET CONTENT:
+RULES:
+- Always cite the source page/section when using document content
+- Be specific — reference exact data, numbers, names, and details from the document
+- Keep answers clear, professional, and well-structured
+- Do not make up information that isn't in the source content
+
+DOCUMENT CONTENT:
 ${contextBlock}`
 
   const messages: ChatCompletionMessageParam[] = [
@@ -134,7 +99,7 @@ ${contextBlock}`
     { role: "user", content: userMessage },
   ]
 
-  // 5. Kick off the streaming completion.
+  // 4. Kick off the streaming completion.
   const client = openai()
   const completion = await withRetry(() =>
     client.chat.completions.create({
@@ -160,7 +125,7 @@ ${contextBlock}`
           }
         }
 
-        // 6. Persist the assistant message BEFORE closing the stream.
+        // 5. Persist the assistant message BEFORE closing the stream.
         // Doing this after `controller.close()` races with serverless
         // function termination and with any client that reconciles
         // history the instant the stream ends (e.g. our Chat component
@@ -172,7 +137,7 @@ ${contextBlock}`
             sessionId,
             role: "assistant",
             content: fullResponse,
-            citedSheets: extractCitedSheets(fullResponse),
+            citedSheets: extractCitedSources(fullResponse),
           },
         })
 
@@ -186,21 +151,28 @@ ${contextBlock}`
 }
 
 /**
- * Extract canonical sheet numbers cited in an assistant response.
+ * Matches generic source citations an assistant response may use:
+ *   - "Page 5", "Page 12"
+ *   - Construction-style section labels: "A-201", "E-101", "S-202", …
  *
- * Matches "E-101", "E.101", "E101" — same conventions as
- * `findSheetNumber` in the identify-sheets pipeline — and normalizes
- * every hit to `E-XXX` so downstream citation rendering is consistent.
- * Deduplicates while preserving first-seen order.
+ * The list is normalized (canonical form, deduped, first-seen order)
+ * so downstream citation rendering can show a clean chip row.
  */
-export function extractCitedSheets(text: string): string[] {
+const CITATION_PATTERN = /\b(?:Page\s+(\d+)|([ASMPECL])[-.]?(\d{1,4}))\b/gi
+
+export function extractCitedSources(text: string): string[] {
   if (!text) return []
   const seen = new Set<string>()
   const out: string[] = []
-  const pattern = /\bE[-.]?(\d{3,4})\b/gi
+  const re = new RegExp(CITATION_PATTERN.source, "gi")
   let m: RegExpExecArray | null
-  while ((m = pattern.exec(text)) !== null) {
-    const canonical = `E-${m[1]}`
+  while ((m = re.exec(text)) !== null) {
+    let canonical: string
+    if (m[1]) {
+      canonical = `Page ${m[1]}`
+    } else {
+      canonical = `${m[2].toUpperCase()}-${m[3]}`
+    }
     if (!seen.has(canonical)) {
       seen.add(canonical)
       out.push(canonical)
@@ -208,3 +180,6 @@ export function extractCitedSheets(text: string): string[] {
   }
   return out
 }
+
+/** Back-compat re-export — older call sites may still import this name. */
+export const extractCitedSheets = extractCitedSources

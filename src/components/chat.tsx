@@ -1,4 +1,3 @@
-// VISUAL UPDATE: flex-grow chat panel, thin custom scrollbar, polished composer with focus ring, hover-fill suggested chips, subtle separator between feed and composer
 "use client"
 
 import { Loader2, Send, Sparkles } from "lucide-react"
@@ -22,22 +21,25 @@ interface ChatProps {
 }
 
 const SUGGESTED_QUESTIONS = [
-  "What is the main electrical service size and voltage?",
-  "How many electrical panels are on this project?",
-  "What type of conduit is specified?",
-  "Are there any EV charging provisions?",
+  "What is this document about?",
+  "Summarize the key points",
+  "What are the main specifications?",
+  "List all tables and their data",
+  "What standards or codes are referenced?",
 ]
 
-const CLIENT_CITATION_PATTERN = /\bE[-.]?(\d{3,4})\b/gi
+const CITATION_PATTERN = /\b(?:Page\s+(\d+)|([ASMPECL])[-.]?(\d{1,4}))\b/gi
 
 function extractCitationsClient(text: string): string[] {
   if (!text) return []
   const seen = new Set<string>()
   const out: string[] = []
+  const re = new RegExp(CITATION_PATTERN.source, "gi")
   let m: RegExpExecArray | null
-  const re = new RegExp(CLIENT_CITATION_PATTERN.source, "gi")
   while ((m = re.exec(text)) !== null) {
-    const canonical = `E-${m[1]}`
+    const canonical = m[1]
+      ? `Page ${m[1]}`
+      : `${m[2].toUpperCase()}-${m[3]}`
     if (!seen.has(canonical)) {
       seen.add(canonical)
       out.push(canonical)
@@ -221,7 +223,7 @@ export function Chat({ sessionId, className }: ChatProps) {
       <div className="flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-[0_1px_0_0_rgba(255,255,255,0.03)_inset]">
         <div
           ref={scrollRef}
-          className="pz-scroll flex-1 space-y-5 overflow-y-auto px-5 py-6 sm:px-6"
+          className="ds-scroll flex-1 space-y-5 overflow-y-auto px-5 py-6 sm:px-6"
         >
           {messages.length === 0 ? (
             <EmptyState
@@ -274,9 +276,9 @@ export function Chat({ sessionId, className }: ChatProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Ask about the electrical scope…"
+            placeholder="Ask about this document…"
             disabled={isLoading}
-            className="pz-scroll flex-1 resize-none rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-foreground placeholder:text-[#52525b] transition-all duration-150 focus:border-brand/60 focus:outline-none focus:ring-2 focus:ring-brand/30 disabled:opacity-60"
+            className="ds-scroll flex-1 resize-none rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-foreground placeholder:text-[#52525b] transition-all duration-150 focus:border-brand/60 focus:outline-none focus:ring-2 focus:ring-brand/30 disabled:opacity-60"
           />
           <Button
             type="submit"
@@ -301,7 +303,7 @@ export function Chat({ sessionId, className }: ChatProps) {
         <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
           Shift+Enter
         </kbd>
-        for a new line. Answers are grounded in the extracted electrical sheets.
+        for a new line. Answers cite specific pages.
       </p>
     </section>
   )
@@ -309,17 +311,17 @@ export function Chat({ sessionId, className }: ChatProps) {
 
 function EmptyState({ onPick }: { onPick: (q: string) => void }) {
   return (
-    <div className="pz-fade-in flex flex-col items-center gap-6 py-12">
+    <div className="ds-fade-in flex flex-col items-center gap-6 py-12">
       <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-brand/25 bg-brand/10 text-brand shadow-[0_0_40px_-10px_rgba(59,130,246,0.4)]">
         <Sparkles className="h-6 w-6" />
       </div>
       <div className="text-center">
         <p className="font-heading text-[15px] font-medium text-foreground">
-          Ask anything about this drawing set
+          Ask anything about this document
         </p>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          Answers are grounded in the extracted electrical sheets with
-          citations back to the source.
+          Answers are grounded in the extracted content with citations back to
+          the source pages.
         </p>
       </div>
       <div className="flex max-w-2xl flex-wrap justify-center gap-2">

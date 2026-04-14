@@ -25,7 +25,7 @@ model Sheet {
   id               String   @id @default(uuid())
   sessionId        String
   session          Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  sheetNumber      String // e.g., "E-101"
+  sheetNumber      String // section label, e.g. "A-201", "E-101", or "Page 5"
   pageIndex        Int // 0-based index in original PDF
   extractedText    String
   extractionMethod String // "text" | "vision"
@@ -52,7 +52,7 @@ model Message {
   session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   role        String // "user" | "assistant"
   content     String
-  citedSheets String[] // sheet numbers like ["E-101", "E-201"]
+  citedSheets String[] // section labels like ["Page 5", "A-201"]
   createdAt   DateTime @default(now())
 
   @@index([sessionId])

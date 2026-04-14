@@ -1,4 +1,3 @@
-// VISUAL UPDATE: generous p-12 drop zone, muted upload icon that brightens, progress bar during processing, check icon on file selected, red border in error state
 "use client"
 
 import {
@@ -145,14 +144,14 @@ export function UploadZone() {
             </div>
             <div className="text-center">
               <p className="text-[15px] font-medium text-foreground">
-                {isDragging ? "Drop to upload" : "Drop a PDF drawing set here"}
+                {isDragging ? "Drop to upload" : "Drop a PDF here"}
               </p>
               <p className="mt-1.5 text-sm text-muted-foreground">
                 or{" "}
                 <span className="text-brand underline-offset-4 group-hover:underline">
                   click to browse
                 </span>
-                {" "}— up to a few hundred pages
+                {" "}— any PDF up to 100MB
               </p>
             </div>
           </>
@@ -181,7 +180,7 @@ export function UploadZone() {
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {isUploading
-                  ? "Processing · extracting sheets and embedding content"
+                  ? "Processing · extracting pages and embedding content"
                   : formatBytes(activeFile.size)}
               </p>
               {isUploading && (
@@ -222,7 +221,7 @@ export function UploadZone() {
             className="h-10 bg-brand px-4 text-foreground shadow-[0_1px_0_0_rgba(255,255,255,0.1)_inset] transition-colors hover:bg-brand-hover"
           >
             <Upload className="mr-2 h-4 w-4" />
-            Process drawing set
+            Process document
           </Button>
         )}
         {state.kind === "uploading" && (

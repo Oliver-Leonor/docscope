@@ -1,4 +1,3 @@
-// VISUAL UPDATE: semantic tokens, matches session-page nav layout, pz-fade-in
 "use client"
 
 import { AlertTriangle, ArrowLeft, RotateCcw } from "lucide-react"
@@ -19,14 +18,14 @@ export default function SessionError({
   }, [error])
 
   return (
-    <main className="pz-fade-in flex flex-col gap-6">
+    <main className="ds-fade-in flex flex-col gap-6">
       <nav>
         <Link
           href="/"
           className="group inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-          Back to sessions
+          Back to documents
         </Link>
       </nav>
       <div className="rounded-xl border border-red-500/30 bg-red-500/[0.04] p-10 text-center">

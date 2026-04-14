@@ -1,9 +1,8 @@
-// VISUAL UPDATE: skeleton uses semantic surface/border tokens and matches new home-page rhythm
 import { Loader2 } from "lucide-react"
 
 export default function Loading() {
   return (
-    <div className="pz-fade-in flex flex-col gap-12">
+    <div className="ds-fade-in flex flex-col gap-12">
       <header className="flex flex-col gap-4">
         <div className="h-5 w-28 animate-pulse rounded-md bg-surface" />
         <div className="h-12 w-80 animate-pulse rounded-lg bg-surface sm:h-14" />

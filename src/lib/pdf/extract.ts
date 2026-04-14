@@ -17,8 +17,8 @@ export interface PageText {
  * source order; we normalize to 0-indexed `pageIndex` to match the
  * `Sheet.pageIndex` column in the Prisma schema. Empty pages come back
  * as empty strings — we keep them in the result so that
- * `identifyElectricalSheets` can decide whether to flip a blank page to
- * the vision-fallback path.
+ * `identifyDocumentSections` can decide whether to flip a blank page
+ * to the vision-fallback path.
  */
 export async function extractTextPerPage(
   pdfBuffer: Buffer,

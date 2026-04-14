@@ -1,4 +1,3 @@
-// VISUAL UPDATE: brand accent border-left, larger file name, green-dot Ready badge, 3-col sheet grid with mono sheet numbers, sharper extraction-method pills
 "use client"
 
 import {
@@ -35,15 +34,12 @@ export function CoverPage({
   sheets,
   totalSheets,
   errorMessage,
-  totalPages,
 }: CoverPageProps) {
   return (
     <section className="relative overflow-hidden rounded-xl border border-border bg-surface shadow-[0_1px_0_0_rgba(255,255,255,0.03)_inset]">
-      {/* Brand accent rule on the left edge — visual anchor for the card */}
       <div className="absolute inset-y-0 left-0 w-[3px] bg-gradient-to-b from-brand via-brand/50 to-transparent" />
 
       <div className="p-6 sm:p-8">
-        {/* Header row */}
         <div className="flex items-start gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand ring-1 ring-inset ring-brand/25">
             <FileText className="h-6 w-6" />
@@ -54,12 +50,7 @@ export function CoverPage({
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
               <span className="text-foreground">{totalSheets}</span>{" "}
-              electrical {totalSheets === 1 ? "sheet" : "sheets"} identified
-              {typeof totalPages === "number" && totalPages > 0
-                ? ` out of ${totalPages} total ${
-                    totalPages === 1 ? "page" : "pages"
-                  }`
-                : ""}
+              {totalSheets === 1 ? "page" : "pages"} processed
             </p>
           </div>
           <StatusPill status={status} />
@@ -72,11 +63,10 @@ export function CoverPage({
           </div>
         )}
 
-        {/* Sheet list */}
         <div className="mt-6">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-heading text-[11px] font-medium uppercase tracking-[0.14em] text-[#71717a]">
-              Identified electrical sheets
+              Processed pages
             </h3>
             <Badge className="rounded-full border-border bg-surface-elevated px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-surface-elevated">
               {totalSheets}
@@ -92,9 +82,9 @@ export function CoverPage({
               {sheets.map((sheet, i) => (
                 <li
                   key={`${sheet.sheetNumber}-${sheet.pageIndex}`}
-                  className="pz-fade-in-up pz-lift flex items-center gap-3 rounded-lg border border-border bg-surface-elevated px-3 py-2.5 hover:border-[#3f3f46] hover:bg-surface-hover"
+                  className="ds-fade-in-up ds-lift flex items-center gap-3 rounded-lg border border-border bg-surface-elevated px-3 py-2.5 hover:border-[#3f3f46] hover:bg-surface-hover"
                   style={{
-                    ["--pz-delay" as string]: `${Math.min(i * 30, 600)}ms`,
+                    ["--ds-delay" as string]: `${Math.min(i * 30, 600)}ms`,
                   }}
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand/10 text-brand ring-1 ring-inset ring-brand/20">
@@ -122,7 +112,7 @@ export function CoverPage({
             sheets.length === 0 &&
             !errorMessage && (
               <div className="rounded-lg border border-dashed border-border bg-[#0f0f12] px-6 py-10 text-center text-sm text-muted-foreground">
-                No electrical sheets were found in this PDF.
+                No pages could be read from this PDF.
               </div>
             )}
         </div>
@@ -154,7 +144,7 @@ function StatusPill({ status }: { status: string }) {
         "shrink-0 gap-1.5 rounded-full border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-medium text-amber-300 hover:bg-amber-500/15",
       )}
     >
-      <span className="pz-soft-pulse h-1.5 w-1.5 rounded-full bg-amber-400" />
+      <span className="ds-soft-pulse h-1.5 w-1.5 rounded-full bg-amber-400" />
       Processing
     </Badge>
   )

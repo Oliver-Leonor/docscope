@@ -1,5 +1,4 @@
-// VISUAL UPDATE: rows use pz-lift hover, semantic tokens, relative time formatter, sharper status badges, truncated filenames
-import { AlertCircle, CheckCircle2, Clock, FileText } from "lucide-react"
+import { AlertCircle, FileText } from "lucide-react"
 import Link from "next/link"
 
 import { DeleteSessionButton } from "@/components/delete-session-button"
@@ -68,8 +67,8 @@ export async function SessionList() {
       {rows.map((row, i) => (
         <li
           key={row.id}
-          className="pz-fade-in-up pz-lift group flex items-center gap-2 rounded-lg border border-border bg-surface pr-2 hover:border-[#3f3f46] hover:bg-surface-elevated"
-          style={{ ["--pz-delay" as string]: `${i * 40}ms` }}
+          className="ds-fade-in-up ds-lift group flex items-center gap-2 rounded-lg border border-border bg-surface pr-2 hover:border-[#3f3f46] hover:bg-surface-elevated"
+          style={{ ["--ds-delay" as string]: `${i * 40}ms` }}
         >
           <Link
             href={`/session/${row.id}`}
@@ -87,7 +86,7 @@ export async function SessionList() {
                 <span className="mx-1.5 text-[#52525b]">·</span>
                 <span>
                   {row.sheetCount}{" "}
-                  {row.sheetCount === 1 ? "sheet" : "sheets"}
+                  {row.sheetCount === 1 ? "page" : "pages"}
                 </span>
               </p>
             </div>
@@ -145,7 +144,7 @@ function StatusBadge({ status }: { status: string }) {
   }
   return (
     <Badge className="shrink-0 gap-1.5 rounded-full border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-300 hover:bg-amber-500/15">
-      <span className="pz-soft-pulse h-1.5 w-1.5 rounded-full bg-amber-400" />
+      <span className="ds-soft-pulse h-1.5 w-1.5 rounded-full bg-amber-400" />
       Processing
     </Badge>
   )

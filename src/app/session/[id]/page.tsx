@@ -1,7 +1,6 @@
-// VISUAL UPDATE: min-h-screen flex layout so chat can flex-grow, compact nav, mono muted session ID, pz-fade-in on state transitions, semantic tokens
 "use client"
 
-import { AlertCircle, ArrowLeft, Loader2, Zap } from "lucide-react"
+import { AlertCircle, ArrowLeft, FileSearch, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { use, useEffect, useState } from "react"
 
@@ -86,18 +85,18 @@ export default function SessionPage({
   }, [id])
 
   return (
-    <main className="pz-fade-in flex min-h-[calc(100vh-5rem)] flex-col gap-6">
+    <main className="ds-fade-in flex min-h-[calc(100vh-5rem)] flex-col gap-6">
       <nav className="flex items-center justify-between gap-4">
         <Link
           href="/"
           className="group inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-          Back to sessions
+          Back to documents
         </Link>
         <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[#71717a]">
-          <Zap className="h-3 w-3 text-brand" />
-          <span className="hidden sm:inline">PunchZero ·</span>
+          <FileSearch className="h-3 w-3 text-brand" />
+          <span className="hidden sm:inline">DocScope ·</span>
           <span>Session {id.slice(0, 8)}</span>
         </span>
       </nav>
@@ -171,8 +170,7 @@ function ProcessingNotice() {
     <div className="flex items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-[#0f0f12] px-6 py-10 text-sm text-muted-foreground">
       <Loader2 className="h-4 w-4 animate-spin text-brand" />
       <span>
-        Extracting electrical sheets and embedding text — this updates every
-        two seconds.
+        Extracting pages and embedding text — this updates every two seconds.
       </span>
     </div>
   )

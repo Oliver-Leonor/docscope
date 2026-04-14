@@ -1,10 +1,10 @@
 export interface TextChunk {
   content: string
-  sheetNumber: string
+  sectionLabel: string
 }
 
 /**
- * Split extracted sheet text into overlapping chunks ready for embedding.
+ * Split extracted page text into overlapping chunks ready for embedding.
  *
  * Strategy:
  *   - Target ~500 tokens / ~2000 chars per chunk.
@@ -13,16 +13,16 @@ export interface TextChunk {
  *   - Prefer splitting on blank-line paragraph boundaries; fall back to
  *     a hard character window when a single paragraph is larger than the
  *     target budget.
- *   - Every chunk is prefixed with `[Sheet E-XXX]` so that the LLM sees
- *     the source sheet inline when the chunk is retrieved, even without
- *     extra metadata plumbing.
+ *   - Every chunk is prefixed with `[{sectionLabel}]` (e.g. `[Page 5]`
+ *     or `[A-201]`) so that the LLM sees the source page inline when
+ *     the chunk is retrieved, even without extra metadata plumbing.
  *
  * Why 500 tokens: small enough for precise retrieval, large enough to
  * carry meaningful context. At query time we retrieve top-5 chunks,
- * giving ~2,500 tokens of grounding — plenty of headroom in a gpt-4o
- * context window.
+ * giving ~2,500 tokens of grounding — plenty of headroom in a modern
+ * chat model context window.
  */
-export function chunkText(text: string, sheetNumber: string): TextChunk[] {
+export function chunkText(text: string, sectionLabel: string): TextChunk[] {
   const TARGET = 2000
   const OVERLAP = 200
 
@@ -86,8 +86,8 @@ export function chunkText(text: string, sheetNumber: string): TextChunk[] {
   }
 
   return windowed.map((content) => ({
-    content: `[Sheet ${sheetNumber}] ${content}`,
-    sheetNumber,
+    content: `[${sectionLabel}] ${content}`,
+    sectionLabel,
   }))
 }
 

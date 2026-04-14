@@ -1,4 +1,3 @@
-// VISUAL UPDATE: rounded-br-sm user tail, inline citation pills with brand ring, sources footer with thin divider, pz-fade-in on mount, streaming cursor support
 "use client"
 
 import { Loader2 } from "lucide-react"
@@ -15,12 +14,13 @@ export interface MessageBubbleProps {
   createdAt?: string
 }
 
-const CITATION_PATTERN = /\b(E[-.]?\d{3,4})\b/gi
+const CITATION_PATTERN = /\b(Page\s+\d+|[ASMPECL][-.]?\d{1,4})\b/g
 
 /**
- * Walk through `text` and replace every inline citation (E-101 / E.101
- * / E101) with a styled `<span>` badge. Text outside citations is kept
- * as plain string nodes so `whitespace-pre-wrap` continues to work.
+ * Walk through `text` and replace every inline citation ("Page 5",
+ * "A-201", "E-101", …) with a styled `<span>` badge. Text outside
+ * citations is kept as plain string nodes so `whitespace-pre-wrap`
+ * continues to work.
  */
 function renderContent(text: string): React.ReactNode[] {
   const out: React.ReactNode[] = []
@@ -33,8 +33,8 @@ function renderContent(text: string): React.ReactNode[] {
       out.push(text.slice(lastIndex, start))
     }
 
-    const raw = match[1].toUpperCase().replace(".", "-")
-    const canonical = raw.startsWith("E-") ? raw : `E-${raw.slice(1)}`
+    const raw = match[1]
+    const canonical = canonicalizeCitation(raw)
 
     out.push(
       <span
@@ -51,6 +51,16 @@ function renderContent(text: string): React.ReactNode[] {
     out.push(text.slice(lastIndex))
   }
   return out
+}
+
+function canonicalizeCitation(raw: string): string {
+  if (/^Page\s+\d+$/i.test(raw)) {
+    const n = raw.match(/\d+/)?.[0] ?? ""
+    return `Page ${n}`
+  }
+  const m = /^([ASMPECL])[-.]?(\d{1,4})$/i.exec(raw)
+  if (!m) return raw
+  return `${m[1].toUpperCase()}-${m[2]}`
 }
 
 function formatTime(iso?: string): string | undefined {
@@ -77,7 +87,7 @@ export function MessageBubble({
   return (
     <div
       className={cn(
-        "pz-fade-in group flex w-full",
+        "ds-fade-in group flex w-full",
         isUser ? "justify-end" : "justify-start",
       )}
     >
@@ -97,7 +107,7 @@ export function MessageBubble({
         ) : (
           <div className="whitespace-pre-wrap break-words">
             {isUser ? content : renderContent(content)}
-            {streaming && <span className="pz-cursor" aria-hidden="true" />}
+            {streaming && <span className="ds-cursor" aria-hidden="true" />}
           </div>
         )}
 
