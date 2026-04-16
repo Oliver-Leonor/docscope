@@ -6,7 +6,7 @@ DocScope is a full-stack document intelligence application that processes PDF up
 
 ## Live Demo
 
-[[docscope.vercel.app](https://electrical-pdf-qa.vercel.app/)](https://electrical-pdf-qa.vercel.app/) _(or your actual URL)_
+https://electrical-pdf-qa.vercel.app/
 
 ## Features
 
