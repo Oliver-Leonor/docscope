@@ -8,10 +8,9 @@ export interface PageText {
 /**
  * Extract text from each page of a PDF buffer.
  *
- * Uses `unpdf`, a serverless-friendly redistribution of pdf.js. Unlike
- * `pdf-parse` / raw `pdfjs-dist`, unpdf ships a build that does not pull
- * in `@napi-rs/canvas` and does not touch `DOMMatrix` / `Path2D` / `ImageData`
- * at module load, so it boots cleanly inside a Vercel serverless function.
+ * Uses unpdf's serverless build of pdf.js for text extraction. This
+ * application does not use unpdf's rendering APIs or rasterize pages
+ * locally; vision receives single-page PDFs prepared with pdf-lib.
  *
  * `extractText` with `mergePages: false` returns one entry per page in
  * source order; we normalize to 0-indexed `pageIndex` to match the

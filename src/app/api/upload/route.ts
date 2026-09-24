@@ -5,10 +5,11 @@ import { prisma } from "@/lib/db"
 import { embedAndStoreChunks } from "@/lib/ai/embeddings"
 import { chunkText } from "@/lib/pdf/chunk"
 import { identifyDocumentSections } from "@/lib/pdf/identify-sheets"
+import { MAX_UPLOAD_BYTES } from "@/lib/upload-limits"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
-// Vercel Pro max; on Hobby this is clamped to 60s automatically.
+// Requested maximum for this synchronous route; actual limits depend on deployment.
 export const maxDuration = 300
 
 /**
@@ -17,7 +18,7 @@ export const maxDuration = 300
  * Accepts a multipart PDF upload and, inline, runs the full processing
  * pipeline:
  *
- *   1. Parse multipart form; validate .pdf extension.
+ *   1. Parse multipart form; validate file size, .pdf extension, and PDF signature.
  *   2. Upload the raw bytes to Vercel Blob for persistence.
  *   3. Create a `Session` row in `processing` state.
  *   4. Run `identifyDocumentSections` (text extraction + vision fallback
@@ -26,17 +27,29 @@ export const maxDuration = 300
  *      embed those chunks, and persist them as `Chunk` rows with
  *      pgvector embeddings.
  *   6. Flip the session to `ready` (or `error` + `errorMessage` when
- *      extraction recovered nothing at all).
+ *      extraction returned no pages).
  */
 export async function POST(request: NextRequest) {
   let sessionId: string | null = null
   try {
-    const formData = await request.formData()
+    const formData = await request.formData().catch(() => null)
+    if (!formData) {
+      return NextResponse.json(
+        { error: "Expected multipart form data containing a PDF file" },
+        { status: 400 },
+      )
+    }
     const file = formData.get("pdf")
     if (!(file instanceof File)) {
       return NextResponse.json(
         { error: "Missing 'pdf' file in form data" },
         { status: 400 },
+      )
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json(
+        { error: "PDFs must be 4 MB or smaller." },
+        { status: 413 },
       )
     }
     if (!file.name.toLowerCase().endsWith(".pdf")) {
@@ -47,6 +60,13 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())
+    // A basic format check, not full PDF validation or sanitization.
+    if (!buffer.subarray(0, 5).equals(Buffer.from("%PDF-"))) {
+      return NextResponse.json(
+        { error: "Invalid PDF file: missing PDF signature" },
+        { status: 400 },
+      )
+    }
 
     const blob = await put(`pdfs/${Date.now()}-${file.name}`, buffer, {
       access: "public",

@@ -44,13 +44,11 @@ const SECTION_PREFIX_RE = /\b([ASMPECL])[-.]?(\d{1,4})\b/
  *      gpt-4o-mini for vision extraction and label it by whatever the
  *      text recovery found, or fall back to "Page N".
  *
- * Every page of the uploaded PDF ends up represented in the output,
- * sorted by page index. Nothing is filtered out: if a user uploads a
- * 10-page PDF, they see 10 processed pages on the cover and can ask
- * questions that span any of them.
+ * Returned pages are sorted by page index, including pages with no
+ * recovered text. Empty text produces no chunks for retrieval.
  *
- * Vision calls run in parallel via `Promise.all` so wall-clock time
- * scales with the slowest page, not the total page count.
+ * Vision calls run concurrently via `Promise.all`. Total processing
+ * time also includes PDF preparation, retries, and later embedding/DB work.
  */
 export async function identifyDocumentSections(
   pdfBuffer: Buffer,

@@ -1,3 +1,4 @@
+import { del } from "@vercel/blob"
 import { NextRequest, NextResponse } from "next/server"
 
 import { prisma } from "@/lib/db"
@@ -8,8 +9,8 @@ export const dynamic = "force-dynamic"
 /**
  * DELETE /api/session/[id]
  *
- * Removes a session and every row that belongs to it. The Prisma
- * schema declares `onDelete: Cascade` on every child relation
+ * Deletes the uploaded PDF, then the session and its related rows.
+ * The Prisma schema declares `onDelete: Cascade` on every child relation
  * (Sheet → Chunk, Sheet ← Session, Message ← Session), so a single
  * `session.delete` cascades all the way down to Chunk embeddings.
  *
@@ -25,7 +26,7 @@ export async function DELETE(
 
     const existing = await prisma.session.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, pdfBlobUrl: true },
     })
     if (!existing) {
       return NextResponse.json(
@@ -34,6 +35,11 @@ export async function DELETE(
       )
     }
 
+    // Delete the Blob first so a storage failure preserves its URL for retry.
+    // Deleting the DB row first could leave a public Blob without its reference.
+    // If the DB delete then fails, the session remains but its PDF is gone;
+    // retrying is safe because del() also succeeds when the Blob is absent.
+    await del(existing.pdfBlobUrl)
     await prisma.session.delete({ where: { id } })
     return new NextResponse(null, { status: 204 })
   } catch (error) {

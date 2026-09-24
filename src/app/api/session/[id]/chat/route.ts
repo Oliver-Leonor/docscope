@@ -16,7 +16,7 @@ export const maxDuration = 60
  * The response body is piped directly from the OpenAI streaming
  * completion via a `ReadableStream` built in
  * {@link generateChatResponse}. The browser consumes it with
- * `Response.body.getReader()` for token-by-token UX. Server-side, once
+ * `Response.body.getReader()` for token-by-token UX. Server-side, before
  * the stream closes, the full assistant message is persisted to the
  * `Message` table with parsed citation metadata.
  */

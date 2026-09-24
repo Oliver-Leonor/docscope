@@ -71,9 +71,9 @@ export function DeleteSessionButton({
             Delete session?
           </DialogTitle>
           <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-            This will permanently remove{" "}
+            This will permanently delete the uploaded PDF{" "}
             <span className="font-mono text-foreground">{pdfFileName}</span>{" "}
-            and all of its extracted sheets, embeddings, and chat history.
+            and its session, extracted content, embeddings, and chat history.
             This action cannot be undone.
           </DialogDescription>
         </DialogHeader>

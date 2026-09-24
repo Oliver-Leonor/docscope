@@ -303,7 +303,7 @@ export function Chat({ sessionId, className }: ChatProps) {
         <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
           Shift+Enter
         </kbd>
-        for a new line. Answers cite specific pages.
+        for a new line. Check answers against the cited pages or sections.
       </p>
     </section>
   )
@@ -320,8 +320,8 @@ function EmptyState({ onPick }: { onPick: (q: string) => void }) {
           Ask anything about this document
         </p>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          Answers are grounded in the extracted content with citations back to
-          the source pages.
+          The assistant is instructed to answer from document content, cite
+          sources, and acknowledge insufficient evidence. Answers can be wrong.
         </p>
       </div>
       <div className="flex max-w-2xl flex-wrap justify-center gap-2">

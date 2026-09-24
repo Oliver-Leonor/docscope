@@ -25,16 +25,13 @@ function toVectorLiteral(vec: number[]): string {
 /**
  * Embed a batch of text chunks and persist them to the `Chunk` table.
  *
- * Uses `text-embedding-3-small` (1536 dims):
- *   - $0.02 / 1M tokens — cheapest OpenAI embedding model
- *   - Solid quality for document-level retrieval
- *   - The API accepts up to 2048 inputs per call; we cap at 100 to stay
- *     well under the 300k token per-request ceiling while keeping round
- *     trips low for typical drawing sets.
+ * Uses `text-embedding-3-small` and validates 1536-dimensional results.
+ * Batches contain at most 100 chunks; this is an input-count limit,
+ * not a measured cost/quality optimum or an enforced token budget.
  *
  * Prisma 6 can't natively serialize `vector(1536)`, so we insert each row
  * with `$executeRaw` and an explicit `::vector` cast on the stringified
- * embedding. IDs are generated client-side with `uuid` because `$executeRaw`
+ * embedding. IDs are generated in server-side code with `uuid` because `$executeRaw`
  * bypasses Prisma's default-value machinery.
  */
 export async function embedAndStoreChunks(

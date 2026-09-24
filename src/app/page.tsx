@@ -21,8 +21,8 @@ export default function Home() {
           DocScope
         </h1>
         <p className="max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-[17px]">
-          Upload any PDF document. We&apos;ll extract the content, index every
-          page, and let you ask questions with citations back to the source.
+          Upload a PDF document. We&apos;ll process its pages, index recovered
+          text, and let you ask questions with citations back to the source.
         </p>
       </header>
 

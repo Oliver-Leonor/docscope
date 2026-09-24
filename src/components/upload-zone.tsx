@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation"
 import * as React from "react"
 
 import { Button } from "@/components/ui/button"
+import { MAX_UPLOAD_BYTES } from "@/lib/upload-limits"
 import { cn } from "@/lib/utils"
 
 type UploadState =
@@ -30,6 +31,10 @@ export function UploadZone() {
     if (!file) return
     if (!file.name.toLowerCase().endsWith(".pdf")) {
       setState({ kind: "error", message: "Only .pdf files are supported." })
+      return
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setState({ kind: "error", message: "PDFs must be 4 MB or smaller." })
       return
     }
     setState({ kind: "selected", file })
@@ -151,7 +156,7 @@ export function UploadZone() {
                 <span className="text-brand underline-offset-4 group-hover:underline">
                   click to browse
                 </span>
-                {" "}— any PDF up to 100MB
+                {" "}— PDFs up to 4 MB
               </p>
             </div>
           </>

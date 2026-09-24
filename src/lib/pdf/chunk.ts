@@ -7,9 +7,9 @@ export interface TextChunk {
  * Split extracted page text into overlapping chunks ready for embedding.
  *
  * Strategy:
- *   - Target ~500 tokens / ~2000 chars per chunk.
- *   - 200-char overlap between adjacent chunks so context isn't severed
- *     mid-sentence at chunk boundaries.
+ *   - Target ~2000 chars per chunk; token counts are not measured.
+ *   - Carry up to 200 chars across adjacent chunks as a continuity
+ *     heuristic; this does not guarantee intact sentence boundaries.
  *   - Prefer splitting on blank-line paragraph boundaries; fall back to
  *     a hard character window when a single paragraph is larger than the
  *     target budget.
@@ -17,10 +17,9 @@ export interface TextChunk {
  *     or `[A-201]`) so that the LLM sees the source page inline when
  *     the chunk is retrieved, even without extra metadata plumbing.
  *
- * Why 500 tokens: small enough for precise retrieval, large enough to
- * carry meaningful context. At query time we retrieve top-5 chunks,
- * giving ~2,500 tokens of grounding — plenty of headroom in a modern
- * chat model context window.
+ * These character-based settings and top-5 retrieval limit the amount
+ * of text sent as context; they have not been tuned against a scored
+ * retrieval evaluation in this repository.
  */
 export function chunkText(text: string, sectionLabel: string): TextChunk[] {
   const TARGET = 2000
