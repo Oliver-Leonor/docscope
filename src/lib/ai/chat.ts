@@ -40,30 +40,33 @@ export async function generateChatResponse(
   sessionId: string,
   userMessage: string,
 ): Promise<ReadableStream<Uint8Array>> {
-  // 1. Recent history (before we insert the new user turn).
-  const recent = await prisma.message.findMany({
-    where: { sessionId },
-    orderBy: { createdAt: "desc" },
-    take: HISTORY_WINDOW,
-  })
-  const chatHistory = recent.reverse()
-
-  // 2. Persist the incoming user message.
-  await prisma.message.create({
-    data: {
-      sessionId,
-      role: "user",
-      content: userMessage,
-      citedSheets: [],
-    },
-  })
-
-  // 3. Retrieve grounding chunks.
-  const relevantChunks = await retrieveRelevantChunks(
-    sessionId,
-    userMessage,
-    RETRIEVAL_TOP_K,
-  )
+  // Retrieval is independent of message history and persistence. Keep the
+  // history read before the new user write so this turn isn't included twice.
+  const [historyResult, retrievalResult] = await Promise.allSettled([
+    (async () => {
+      const recent = await prisma.message.findMany({
+        where: { sessionId },
+        orderBy: { createdAt: "desc" },
+        take: HISTORY_WINDOW,
+      })
+      await prisma.message.create({
+        data: {
+          sessionId,
+          role: "user",
+          content: userMessage,
+          citedSheets: [],
+        },
+      })
+      return recent.reverse()
+    })(),
+    retrieveRelevantChunks(sessionId, userMessage, RETRIEVAL_TOP_K),
+  ])
+  // Settle both paths before propagating failures; no user-message write
+  // should be left running after the route reports an error.
+  if (historyResult.status === "rejected") throw historyResult.reason
+  if (retrievalResult.status === "rejected") throw retrievalResult.reason
+  const chatHistory = historyResult.value
+  const relevantChunks = retrievalResult.value
 
   const contextBlock =
     relevantChunks.length === 0

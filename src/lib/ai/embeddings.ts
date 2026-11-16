@@ -7,6 +7,7 @@ import { withRetry } from "./retry"
 const EMBEDDING_MODEL = "text-embedding-3-small"
 const EMBEDDING_DIMS = 1536
 const BATCH_SIZE = 100
+const INSERT_CONCURRENCY = 5
 
 let _openai: OpenAI | null = null
 function openai(): OpenAI {
@@ -32,7 +33,8 @@ function toVectorLiteral(vec: number[]): string {
  * Prisma 6 can't natively serialize `vector(1536)`, so we insert each row
  * with `$executeRaw` and an explicit `::vector` cast on the stringified
  * embedding. IDs are generated in server-side code with `uuid` because `$executeRaw`
- * bypasses Prisma's default-value machinery.
+ * bypasses Prisma's default-value machinery. Insert waves are limited to
+ * five writes per invocation so a full embedding batch can't flood the pool.
  */
 export async function embedAndStoreChunks(
   chunks: Array<{ content: string; sheetId: string }>,
@@ -57,22 +59,37 @@ export async function embedAndStoreChunks(
       )
     }
 
-    await Promise.all(
-      batch.map(async (chunk, j) => {
-        const vec = response.data[j].embedding
-        if (vec.length !== EMBEDDING_DIMS) {
-          throw new Error(
-            `Unexpected embedding length ${vec.length}, expected ${EMBEDDING_DIMS}`,
-          )
-        }
-        const id = uuidv4()
-        const vectorLiteral = toVectorLiteral(vec)
-        await prisma.$executeRaw`
-          INSERT INTO "Chunk" (id, "sheetId", content, embedding, "createdAt")
-          VALUES (${id}, ${chunk.sheetId}, ${chunk.content}, ${vectorLiteral}::vector, NOW())
-        `
-      }),
-    )
+    // Use the API's input index, rather than response order, to retain the
+    // correct page association. Validate the whole batch before any writes.
+    const embeddings = [...response.data].sort((a, b) => a.index - b.index)
+    for (const [j, result] of embeddings.entries()) {
+      if (result.index !== j) {
+        throw new Error("Invalid embedding indexes in response")
+      }
+      if (result.embedding.length !== EMBEDDING_DIMS) {
+        throw new Error(
+          `Unexpected embedding length ${result.embedding.length}, expected ${EMBEDDING_DIMS}`,
+        )
+      }
+    }
+
+    for (let start = 0; start < batch.length; start += INSERT_CONCURRENCY) {
+      const results = await Promise.allSettled(
+        batch.slice(start, start + INSERT_CONCURRENCY).map(async (chunk, offset) => {
+          const vec = embeddings[start + offset].embedding
+          const id = uuidv4()
+          const vectorLiteral = toVectorLiteral(vec)
+          await prisma.$executeRaw`
+            INSERT INTO "Chunk" (id, "sheetId", content, embedding, "createdAt")
+            VALUES (${id}, ${chunk.sheetId}, ${chunk.content}, ${vectorLiteral}::vector, NOW())
+          `
+        }),
+      )
+      // Drain in-flight writes before reporting failure to the upload route.
+      // A failed wave must not start further inserts or embedding batches.
+      const failure = results.find((result) => result.status === "rejected")
+      if (failure) throw failure.reason
+    }
   }
 }
 
