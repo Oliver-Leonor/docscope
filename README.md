@@ -47,6 +47,8 @@ User question → Embed query → pgvector cosine similarity → Top-5 chunks
 
 Processing runs synchronously before the upload response. The 4 MB file limit is deliberately conservative because the multipart request adds overhead. The upload route requests a maximum duration of 300 seconds; the live deployment's effective limit has not been verified. Completion time depends on document contents, extraction work, external APIs, and database latency. Larger-file support would be a future change using direct-to-object-storage uploads; that flow is not implemented here.
 
+Ingestion collects labeled chunks across all pages before embedding them in batches of up to 100. Chunk inserts run at most five at a time per upload. Each chunk retains its page's Sheet ID for retrieval and citations. A session becomes ready only after all inserts finish; documents with no recovered text are marked unreadable. Chat retrieval runs alongside history loading and user-message persistence, while the history read still precedes the new user message and the assistant message is stored before the stream closes.
+
 Answer grounding is guided by prompt instructions, which do not guarantee correctness or prevent the model from using outside knowledge. Citations are model-generated references, not independent verification. Retrieval uses the top five chunks, so missing information in those excerpts does not prove it is absent from the whole document.
 
 ## Running Locally
@@ -64,6 +66,17 @@ npm run dev
 Open <http://localhost:3000> and upload a PDF to try it.
 
 Both Prisma CLI and Next.js read the root `.env` file.
+
+## Local checks
+
+```bash
+npm test
+npm run test:performance
+npm run lint
+npm run build
+```
+
+Tests mock Blob, OpenAI, and the database; they do not require credentials or access production data. The performance check generates small PDFs with invented content in memory and runs real text extraction. It verifies embedding request counts and insert concurrency, not live service latency. Measure first-token, total-response, and database timings separately against an isolated test database and test credentials before making latency claims.
 
 ## Key Architecture Decisions
 

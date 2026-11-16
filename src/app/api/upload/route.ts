@@ -23,11 +23,10 @@ export const maxDuration = 300
  *   3. Create a `Session` row in `processing` state.
  *   4. Run `identifyDocumentSections` (text extraction + vision fallback
  *      for low-text pages), which returns one labeled entry per page.
- *   5. For each page: insert a `Sheet` row, chunk its extracted text,
- *      embed those chunks, and persist them as `Chunk` rows with
- *      pgvector embeddings.
+ *   5. For each page: insert a `Sheet` row and collect its labeled chunks.
+ *      Embed and store the collected chunks in batches across pages.
  *   6. Flip the session to `ready` (or `error` + `errorMessage` when
- *      extraction returned no pages).
+ *      extraction returned no indexable text).
  */
 export async function POST(request: NextRequest) {
   let sessionId: string | null = null
@@ -96,6 +95,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ sessionId: session.id })
     }
 
+    const documentChunks: Array<{ content: string; sheetId: string }> = []
     for (const section of sections) {
       const sheetRecord = await prisma.sheet.create({
         data: {
@@ -108,15 +108,23 @@ export async function POST(request: NextRequest) {
       })
 
       const chunks = chunkText(section.extractedText, section.sectionLabel)
-      if (chunks.length > 0) {
-        await embedAndStoreChunks(
-          chunks.map((c) => ({
-            content: c.content,
-            sheetId: sheetRecord.id,
-          })),
-        )
+      for (const chunk of chunks) {
+        documentChunks.push({ content: chunk.content, sheetId: sheetRecord.id })
       }
     }
+
+    if (documentChunks.length === 0) {
+      await prisma.session.update({
+        where: { id: session.id },
+        data: {
+          status: "error",
+          errorMessage: "This PDF appears to be empty or could not be read.",
+        },
+      })
+      return NextResponse.json({ sessionId: session.id })
+    }
+
+    await embedAndStoreChunks(documentChunks)
 
     await prisma.session.update({
       where: { id: session.id },
